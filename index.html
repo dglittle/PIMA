@@ -1,0 +1,676 @@
+<html>
+<head>
+<title>PIMA</title>
+<link rel="StyleSheet" href="/css/my.css" type="text/css">
+<link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/start/jquery-ui.css" type="text/css" rel="Stylesheet" />
+</head>
+<body>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
+<script src="/js/tab.js"> </script>
+<script src="/js/myutil.js"> </script>
+<script src="/js/json2.js"></script>
+<script src="js/AES.js"></script>
+<script>
+/* <![CDATA[ */
+
+function createSmallCardDiv(card) {
+    var text = card.text
+    var orig = text
+    
+    text = text.match(/(@info\r?\n)?[ \t\r\n]*(.*)/)[2]
+    if (text.length > 30) {
+        text = text.substring(0, 27) + "..."
+    }
+    text = text.replace(/\s+/g, " ")    
+    
+    if (card != model.cards[0]) {
+        var div = $('<div class="small-card" title="' + escapeXML(orig) + '"></div>')
+    } else {
+        var div = $('<div class="current-small-card" title="' + escapeXML(orig) + '"></div>')
+    }
+    if (text.match(/\S/))
+        div.text(text)
+    else
+        div.text('...')
+    div.click(function () {
+        openCard(card)
+    })
+    return div    
+}
+
+function newCard() {
+    var now = time()
+    return {
+        text : "",
+        createTime : now,
+        showTime : now,
+        lastPushTime : 0,
+        touchTime : now,
+    }
+}
+
+function addNewCard() {
+    model.cards.push(newCard())
+    refresh()
+    $('#current-card').focus()
+}
+
+function openCard(card) {
+    card.touchTime = time()
+    refresh()
+}
+
+function getUpcoming() {
+    var now = time()
+    
+    var upcoming1 = []
+    var upcoming2 = []
+    var upcoming3 = []
+    var cards = model.cards.slice(0).sort(function (a, b) {
+        var d = a.showTime - b.showTime
+        if (d != 0) return d
+        d = b.createTime - a.createTime
+        if (d != 0) return d
+        return strcmp(a.text, b.text)
+    })
+    foreach(cards, function (card) {
+        if (card.showTime <= now)
+            upcoming1.push(card)
+        else if (card.showTime <= now + (15 * 60 * 1000))
+            upcoming2.push(card)
+        else if (upcoming3.length < 10)
+            upcoming3.push(card)
+        else
+            return false
+    })
+    upcoming1.sort(function (a, b) {
+        return a.lastPushTime - b.lastPushTime
+    })
+    return [upcoming1, upcoming2, upcoming3]
+}
+
+function postpone(amount, fuzzy) {
+    model.cards[0].lastPushTime = amount
+    if (fuzzy) {
+        amount *= 1 - Math.pow(Math.random(), 3) 
+    }
+    model.cards[0].showTime = time() + amount
+    
+    var upcoming = getUpcoming()
+    if (upcoming[0].length > 0) {
+        // openCard(upcoming[0][0])
+        openCard(upcoming[0][upcoming[0].length - 1])
+    } else if (upcoming[1].length > 0) {
+        openCard(upcoming[1][0])
+    } else if (upcoming[2].length > 0) {
+        openCard(upcoming[2][0])
+    } else {
+        refresh()
+    }
+}
+
+function addCards(dest, cards) {
+    dest.empty()
+    foreach(cards, function (card) {
+        dest.append(createSmallCardDiv(card))
+    })
+}
+
+function editCard(dest, card) {
+    $('#current-card-passwords').empty()
+    dest.unbind()
+    dest.val(card.text)
+    function save() {
+        card.text = dest.val()
+        onChange()
+    }
+    dest.keydown(save)
+    dest.keyup(save)
+}
+
+function viewPasswordCard(dest, card) {
+    var now = time()
+    if ((card.showPasswordsUntil && now < card.showPasswordsUntil) || (!card.showPasswordsUntil && now < card.createTime + 1000 * 60 * 10)) {
+        editCard(dest, card)
+        $('#current-card-passwords').append($('<button>hide passwords</button>').click(function () {
+            card.showPasswordsUntil = now
+            refresh()
+        }))
+        return
+    }
+    
+    dest.unbind()
+    dest.val("click here to edit")
+    dest.click(function () {
+        card.showPasswordsUntil = time() + 1000 * 60 * 10
+        refresh()
+    })
+    
+    var s = card.text
+    
+    var token = "XXX"
+    while (s.match(token)) {
+        token += "X"
+    }
+    
+    var a = []
+    s = s.replace(/(http:|https:)|(:\s*)(.*)/g, function (m, _, colon, value) {
+        if (_) return m
+        a.push(value)
+        return colon + token
+    })
+    s = escapeXml(s)
+    s = s.replace(/\r?\n/g, '<br>')
+	
+    var i = 0
+    s = s.replace(new RegExp(token, 'g'), function () {
+        var r = '<span class="copyable">XXX</span>'
+        i++
+        return r
+    })
+    
+    var copypad = $('<input type="text" style="width:0px"></input>')
+    var copypadMessage = $('<span></span>')
+    $('.copyable', $('#current-card-passwords').empty().html(s + "<br>").append(copypad).append(copypadMessage)).each(function (i, span) {
+        $(span).click(function () {
+            copypad.val(a[i]).select().focus()
+            copypadMessage.html('<b>&larr; ctrl-c</b>')
+        })
+    })
+    copypad.keyup(function () {
+        window.setTimeout(function () {
+            copypad.val('nothing').select().focus()
+            copypadMessage.text('')
+        }, 0)
+    })    
+}
+
+function refresh() {
+    onChange()
+    
+    var now = time()
+    
+    editCard($("#working-card"), model.workingCard)
+    
+    model.cards.sort(function (a, b) {
+        return b.touchTime - a.touchTime
+    })
+    
+    var currentCard = model.cards[0]
+    
+    var showTime = currentCard.showTime - now
+    if (showTime < 0)
+        showTime = 0
+    $('#showTime').text("showtime: " + englishTimeSpan(showTime))
+    $('#urls').empty()
+    foreach(currentCard.text.match(/https?:\/\/\S+/g), function (url) {
+        $('#urls').append('<div><a target="_blank" href="' + escapeXML(url) + '">' + escapeXML(url.length > 40 ? (url.substring(0, 40) + '...') : url) + '</a></div>')
+        return false // just do first url for now
+    })
+    
+    if (currentCard.text.match(/@password|pass:|password:/)) {
+        viewPasswordCard($("#current-card"), currentCard)
+    } else {
+        editCard($("#current-card"), currentCard)
+    }
+
+    addCards($('#recent-cards'), model.cards.slice(0, 8))
+    
+    var upcoming = getUpcoming()
+    
+    addCards($('body', $('#upcoming1-cards').contents()), upcoming[0])
+    addCards($('body', $('#upcoming2-cards').contents()), upcoming[1])
+    addCards($('body', $('#upcoming3-cards').contents()), upcoming[2])
+    
+    var searchCards = []
+    var q = $('#search-query').val()
+    if (q) {
+        var searchAll = false
+        if (q.match(/^:/)) {
+            searchAll = true
+            q = q.slice(1)
+        }
+        searchCards = filter(model.cards, function (card) {
+            if (!searchAll && card.showTime == Infinity) {
+                return false
+            }
+            var allMatch = true
+            foreach(q.split(/\s+/), function (qq) {
+                if (!card.text.match(new RegExp(qq, "i"))) {
+                    allMatch = false
+                    return false
+                }
+            })
+            return allMatch
+        })
+    }
+    addCards($('#search-cards'), searchCards)
+    
+    // calendar stuff
+    var calCards = []
+    foreach(model.cards, function (card) {
+        var m = card.text.match(/@cal(.*)/)
+        if (m) {
+            calCards.push({
+                cal : m[1],
+                card : card
+            })
+        }
+    })
+    for (var i = 0; i < 7; i++) {
+        var day = now + (i * 1000 * 60 * 60 * 24)
+        var m = ("" + new Date(day)).match(/(\S+) (\S+ \S+)/)
+        var div = $('<div style="width:100%"></div>')
+        $('#day-' + (i + 1)).empty().append($('<span></span>').text(m[0])).append(div)
+        
+        var dayCards = []
+        foreach(calCards, function (calCard) {
+            if (calCard.cal.match(new RegExp(m[1], "i")) || calCard.cal.match(new RegExp(m[2], "i"))) {
+                dayCards.push(calCard.card)
+            }
+        })
+        
+        addCards(div, dayCards)
+    }
+}
+
+function grabFromGMail(button, username, password) {
+    button.attr('disabled', 'disabled')
+    $.post('/api/gmail', username + "," + password, function (data) {
+        var gmailIds = {}
+        foreach(model.cards, function (card) {
+            gmailIds[card.gmailId] = true
+        })
+        var incomingIds = []
+            
+        var ms = eval('(' + data + ')')
+        foreach(ms, function (m) {
+            incomingIds.push(m.gmailId)
+            if (!gmailIds[m.gmailId]) {
+                gmailIds[m.gmailId] = true
+                
+                var card = newCard()
+                card.gmailId = m.gmailId
+                var from = m.from
+                from = trim(from.replace(/ <[^>]+>/, ''))
+                if (from.indexOf("Greg Little") >= 0) {
+                    from = ""
+                } else {
+                    from = '[' + from + '] '
+                }
+                card.text = from + m.subject + "\n: " + ("https://mail.google.com/mail/#inbox/" + m.gmailId) + "\n\n" + m.body + "\n\nfrom gmail " + username
+                model.cards.push(card)
+            }
+        })
+        refresh()
+        
+        if (ms.length > 0) {
+            $.post('/api/gmail-removeStars', [username, password].concat(incomingIds).join(','), function () {
+                setTimeout(function () {
+                    grabFromGMail(button, username, password)
+                }, 0)
+            })
+        } else {
+            button.removeAttr('disabled')
+        }
+    })
+}
+
+$(function () {
+    $('body').ajaxError(function (_, s) {
+        var err = s.responseText
+        var m = err.match(/Exception: (.*)/)
+        if (m) {
+            err = m[1]
+        }
+        alert("error: " + err)
+    })
+
+    ///////////////////////////////////////////////////////////
+    // load should be called after the global "model" is set
+    function load() {
+        onChange = function () {}
+        
+        refresh()
+        
+        $("body").keydown(function (e) {
+            if (e.metaKey && (e.keyCode == 83)) {
+                e.preventDefault()
+                save()
+                
+                // this prevents the keyup event soon to follow
+                // from marking us as dirty
+                var temp = onChange
+                onChange = function () {}
+                setTimeout(function () {
+                    onChange = temp
+                }, 500)
+            }
+            if (e.metaKey && (e.keyCode == 13)) {
+                e.preventDefault()
+                addNewCard()
+            }
+            if (e.metaKey && (e.keyCode == 71)) {
+                e.preventDefault()
+                // go to card
+            }
+        })    
+    
+        function createOnChangeHandler(saveCallback, time) {
+            var self = {
+                dirty : false,
+                callbackTimer : null,
+                onChange : function () {
+                    self.dirty = true
+                    self.clearTimer()
+                    self.callbackTimer = window.setTimeout(function () {
+                        self.onSave()
+                    }, time)
+                },
+                clearTimer : function () {
+                    window.clearTimeout(self.callbackTimer)
+                },
+                onSave : function () {
+                    self.clearTimer()
+                    self.dirty = false
+                    saveCallback()
+                }
+            }
+            return self
+        }
+        var onChangeHandler = createOnChangeHandler(function() {
+            var data = json(model)
+            // var data = JSON.stringify(model)
+            if (password)
+                data = encrypt(data, password)
+
+            $.ajax({
+                type: 'POST',
+                url: '/api/save',
+                data: data,
+                success : function (data) {
+                    $('#save').attr('disabled', 'disabled')
+                }
+            })
+        }, 10 * 1000)
+        onChange = function () {
+            onChangeHandler.onChange()
+            $('#save').removeAttr('disabled')
+        }
+        save = function () {
+            onChangeHandler.onSave()
+            refresh()
+        }
+        $('#save').attr('disabled', 'disabled')
+        $('#save').click(save)
+        
+        function refresher() {
+            if (!onChangeHandler.dirty) {
+                var temp = onChange
+                onChange = function () {}
+                refresh()
+                onChange = temp
+            }
+            setTimeout(refresher, 1000 * 60)
+        }
+        refresher()
+        
+        $('#eval').click(function () {
+            eval($('#working-card').val())
+        })
+        
+        $('#search-query').keydown(function (e) {
+            if (e.keyCode == 13) {
+                refresh()
+            }
+        })
+        
+        // gmail stuff
+        var gmail = $('#gmail')
+        while (ensure(model, "gmailAccounts", []).length < 2) {
+            model.gmailAccounts.push({
+                username : "",
+                password : ""
+            })
+        }
+        foreach(model.gmailAccounts, function (a) {
+            var div = $('<div></div>')
+            var username = $('<input type="text"></input>').attr("value", a.username)
+            var password = $('<input type="password" style="width:40px"></input>').attr("value", a.password)
+            div.append($('<button>get stars</button>').click(function (e) {
+                a.username = username.val()
+                a.password = password.val()
+                grabFromGMail($(this), a.username, a.password)
+            })).append(username).append(password)
+            gmail.append(div)
+        })
+    }
+    
+    ///////////////////////////////////////////////////////////
+    // password encryption stuff
+    var password = ""
+
+    function encrypt(plaintext, password) {
+        return Aes.Ctr.encrypt(plaintext, password, 256);
+    }
+    
+    function decrypt(ciphertext, password) {
+        return Aes.Ctr.decrypt(ciphertext, password, 256);
+    }
+
+    function getPassword(callback) {
+        var div = $('#password-dialog').clone()
+        div.attr("title", "Enter Password")
+        $('tr.old-password', div).hide()
+        $('tr.confirm', div).hide()
+        $('input[type="submit"]', div).attr("value", "ok").click(function () {
+            setTimeout(function () {
+                password = $('.password', div).val()
+                div.dialog("close")
+                callback()
+            }, 0)
+            return false
+        })
+        div.dialog({model : true})
+    }
+
+    setPassword = function() {
+        var div = $('#password-dialog').clone()
+        div.attr("title", "Set Password")
+        if (!password)
+            $('tr.old-password', div).hide()
+        $('input[type="submit"]', div).click(function () {
+            setTimeout(function () {
+                var o = $('input.old-password', div).val()
+                var p = $('.password', div).val()
+                var c = $('input.confirm', div).val()
+                if (o == password && p == c) {
+                    password = p
+                    div.dialog("close")
+                    save()
+                } else {
+                    if (o != password)
+                        alert("old password is not correct")
+                    else
+                        alert("passwords do not match")
+                }
+            }, 0)
+            return false
+        })
+        div.dialog({model : true})
+    }
+    
+    ///////////////////////////////////////////////////////////
+    // create the model
+    $.get('/data.txt', function (data) {
+        if (!data) {
+            model = {
+                cards : [newCard()],
+                workingCard : newCard()
+            }
+            load()
+        } else if (data.match(/^[\(\{\[]/)) {
+            model = eval('(' + data + ')')
+            load()
+        } else {
+            // it's encrypted...
+            function tryToOpen() {
+                getPassword(function () {
+                    x = decrypt(data, password)
+                    try {
+                        model = eval('(' + x + ')')
+                    } catch(e) {
+                        alert("wrong password, decrypted to: " + x.substring(0, 20))
+                        setTimeout(tryToOpen, 0)
+                        return
+                    }
+                    load()
+                })
+            }
+            tryToOpen()
+        }
+    })
+})
+
+/* ]]> */
+</script>
+
+<div id="password-dialog" style="display:none">
+    <form>
+    <table>
+        <tr class="old-password">
+            <td align="right">
+                old&nbsp;password:
+            </td>
+            <td>
+                <input class="old-password" type="password"></input>
+            </td>
+        </tr>
+        <tr>
+            <td align="right">
+                password:
+            </td>
+            <td>
+                <input class="password" type="password"></input>
+            </td>
+        </tr>
+        <tr class="confirm">
+            <td align="right">
+                confirm:
+            </td>
+            <td>
+                <input class="confirm" type="password"></input>
+            </td>
+        </tr>
+        <tr>
+            <td align="right">
+            </td>
+            <td>
+                <input type="submit" value="update"></input>
+            </td>
+        </tr>
+    </table>
+    </form>
+</div>
+
+<table class="fill">
+<tr style="height:100%"><td>
+<table class="fill">
+    <tr style="height:100%">
+        <td style="width:30%">
+            <table class="fill">
+                <tr><td>
+                    <button id="save">save</button>
+                    <button id="eval">eval</button>
+                </td></tr>
+                <tr style="height:100%"><td>
+                    <textarea class="fill" id="working-card" onkeydown="checkTab(event)">hello</textarea>
+                </td></tr>
+                <tr><td>
+                    <div id="gmail"></div>
+                    <button onclick="setPassword()">set password</button>
+                </td></tr>
+            </table>
+        </td>
+        <td style="width:30%">
+            <table class="fill">
+                <tr><td>
+                    <div id="showTime">hi..</div>
+                    <div>
+                        <button onclick="postpone(10 * 60 * 1000)">.</button>
+                        <button onclick="postpone(2 * 60 * 60 * 1000, true)">..</button>
+                        <button onclick="postpone(8 * 60 * 60 * 1000, true)">1</button>
+                        <button onclick="postpone((24 + 8) * 60 * 60 * 1000, true)">2</button>
+                        <button onclick="postpone((48 + 8) * 60 * 60 * 1000, true)">3</button>
+                        <button onclick="postpone((64 + 8) * 60 * 60 * 1000, true)">4</button>
+                        <button onclick="postpone(7 * 24 * 60 * 60 * 1000, true)">w</button>
+                        <button onclick="postpone(30 * 24 * 60 * 60 * 1000, true)">m</button>
+                        <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
+                        <button onclick="postpone(Infinity)">&#8734;</button>
+                    </div>
+                    <div id="urls"></div>
+                    <div id="current-card-passwords"></div>
+                </td></tr>
+                <tr style="height:100%"><td>
+                    <textarea class="fill" id="current-card" onkeydown="checkTab(event)">hello</textarea>
+                </td></tr>
+                <tr><td>
+                </td></tr>
+            </table>
+        </td>
+        <td>
+            <table border="1" class="fill">
+                <tr>
+                    <td style="width:50%" id="recent-cards" valign="top">
+                    </td>
+                    <td style="width:50%" valign="top">
+                        <input style="width:100%"id="search-query" type="text"/>
+                        <div id="search-cards" style="width:100%"/>
+                    </td>
+                </tr>                            
+                <tr style="height:100%">
+                    <td valign="top">
+                        <iframe frameBorder="0" id="upcoming1-cards" class="fill" src="cardHolder.html"></iframe>
+                    </td>
+                    <td>
+                        <table class="fill">
+                            <tr style="height:50%"><td>
+                                <iframe frameBorder="0" id="upcoming2-cards" class="fill" src="cardHolder.html"></iframe>
+                            </td></tr>
+                            <tr><td>
+                                <iframe frameBorder="0" id="upcoming3-cards" class="fill" src="cardHolder.html"></iframe>
+                            </td></tr>
+                        </table>
+                    </td>
+                </tr>                            
+            </table>
+        </td>
+    </tr>
+</table>
+</td></tr>
+<tr><td>
+<table class="fill">
+    <tr>
+        <td id="day-1" style="width:14%" valign="top">
+        </td>
+        <td id="day-2" style="width:14%" valign="top">
+        </td>
+        <td id="day-3" style="width:14%" valign="top">
+        </td>
+        <td id="day-4" style="width:14%" valign="top">
+        </td>
+        <td id="day-5" style="width:14%" valign="top">
+        </td>
+        <td id="day-6" style="width:14%" valign="top">
+        </td>
+        <td id="day-7" style="width:14%" valign="top">
+        </td>
+    </tr>
+</table>
+</td></tr>
+</table>
+
+</body>
+</html>
+
