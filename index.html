@@ -250,6 +250,8 @@ function refresh() {
     // calendar stuff
     var calCards = []
     foreach(model.cards, function (card) {
+        if (card.showTime == Infinity)
+            return
         var m = card.text.match(/@cal(.*)/)
         if (m) {
             calCards.push({
