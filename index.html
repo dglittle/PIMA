@@ -3,6 +3,13 @@
 <title>PIMA</title>
 <link rel="StyleSheet" href="/css/my.css" type="text/css">
 <link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/start/jquery-ui.css" type="text/css" rel="Stylesheet" />
+<style>
+
+.bz button {
+    font-size: xx-small;
+}
+
+</style>
 </head>
 <body>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
@@ -262,7 +269,7 @@ function refresh() {
     })
     for (var i = 0; i < 7; i++) {
         var day = now + (i * 1000 * 60 * 60 * 24)
-        var m = ("" + new Date(day)).match(/(\S+) (\S+ \S+)/)
+        var m = ("" + new Date(day)).replace(/0+([1-9])/g, '$1').match(/(\S+) (\S+ \S+)/)
         var div = $('<div style="width:100%"></div>')
         $('#day-' + (i + 1)).empty().append($('<span></span>').text(m[0])).append(div)
         
@@ -599,15 +606,16 @@ $(function () {
             <table class="fill">
                 <tr><td>
                     <div id="showTime">hi..</div>
-                    <div>
+                    <div class="bz">
                         <button onclick="postpone(10 * 60 * 1000)">.</button>
                         <button onclick="postpone(2 * 60 * 60 * 1000, true)">..</button>
                         <button onclick="postpone(8 * 60 * 60 * 1000, true)">1</button>
                         <button onclick="postpone((24 + 8) * 60 * 60 * 1000, true)">2</button>
-                        <button onclick="postpone((48 + 8) * 60 * 60 * 1000, true)">3</button>
                         <button onclick="postpone((64 + 8) * 60 * 60 * 1000, true)">4</button>
                         <button onclick="postpone(7 * 24 * 60 * 60 * 1000, true)">w</button>
+                        <button onclick="postpone(14 * 24 * 60 * 60 * 1000, true)">2w</button>
                         <button onclick="postpone(30 * 24 * 60 * 60 * 1000, true)">m</button>
+                        <button onclick="postpone(2 * 30 * 24 * 60 * 60 * 1000, true)">2m</button>
                         <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
                         <button onclick="postpone(Infinity)">&#8734;</button>
                     </div>
