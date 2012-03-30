@@ -1,0 +1,33 @@
+
+.fill {
+    width: 100%;
+    height: 100%;
+}
+
+table {
+    border-collapse: collapse;
+}
+th, td {
+    padding: 0;
+}
+    
+body {
+    font-family: Sans-Serif;
+}
+
+.small-card {
+    border-style: ridge;
+    border-width: 1px;
+    background-color: rgb(230, 230, 230);
+}
+
+.current-small-card {
+    border-style: ridge;
+    border-width: 1px;
+    background-color: rgb(230, 230, 0);
+}
+
+.copyable {
+    background-color: rgb(128, 128, 128);
+}
+

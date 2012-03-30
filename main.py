@@ -70,7 +70,10 @@ class MyHandler(BaseHTTPRequestHandler):
                 pm.removeStars(set(params[2:]))
                 pm.logout()
             else:
-                f = open('.' + self.path)
+                p = self.path
+                if p == '/':
+                    p = '/index.html'
+                f = open('.' + p)
                 s = f.read()
                 f.close()
             
@@ -85,9 +88,20 @@ class MyHandler(BaseHTTPRequestHandler):
             self.wfile.write(traceback.format_exc())
 
 def main():
-    server = HTTPServer(('', 5005), MyHandler)
-    print("running server..")
-    server.serve_forever()
+    # ensure existance of data.txt
+    try:
+        f = open('./data.txt')
+    except:
+        f = open('./data.txt', 'w')
+        f.close()
+
+    # start up server
+    if (len(sys.argv) > 1):
+        server = HTTPServer(('', int(sys.argv[1])), MyHandler)
+        print("running server..")
+        server.serve_forever()
+    else:
+        print("usage: python main.py <port> (e.g. python main.py 12345)")
 
 if __name__ == '__main__':
     main()

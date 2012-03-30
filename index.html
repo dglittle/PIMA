@@ -1,8 +1,8 @@
 <html>
 <head>
 <title>PIMA</title>
-<link rel="StyleSheet" href="/css/my.css" type="text/css">
-<link href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/themes/start/jquery-ui.css" type="text/css" rel="Stylesheet" />
+<link rel="StyleSheet" href="js/common.css" type="text/css">
+<link rel="Stylesheet" href="js/jquery-ui.css" type="text/css" />
 <style>
 
 .bz button {
@@ -12,29 +12,107 @@
 </style>
 </head>
 <body>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js"></script>
-<script src="/js/tab.js"> </script>
-<script src="/js/myutil.js"> </script>
-<script src="/js/json2.js"></script>
+<script src="js/jquery.min.js"></script>
+<script src="js/jquery-ui.min.js"></script>
+<script src="js/myutil.js"></script>
+<script src="js/tab.js"></script>
 <script src="js/AES.js"></script>
 <script>
 /* <![CDATA[ */
+
+var inf = 1e100
+
+function englishTimeSpan(t) {
+    var second = 1000
+    var minute = second * 60
+    var hour = minute * 60
+    var day = hour * 24
+    var week = day * 7
+    var month = day * 30
+    var year = day * 365
+    // years
+    if (t >= inf)
+        return "never"
+    if (t / year >= 1)
+        return sprintf("%0.1f years", t / year)
+    if (t / month >= 1)
+        return sprintf("%0.1f months", t / month)
+    if (t / week >= 1)
+        return sprintf("%0.1f weeks", t / week)
+    if (t / day >= 1)
+        return sprintf("%0.1f days", t / day)
+    if (t / hour >= 1)
+        return sprintf("%0.1f hours", t / hour)
+    if (t / minute >= 1)
+        return sprintf("%0.1f minutes", t / minute)
+    if (t / second >= 1)
+        return sprintf("%0.0f seconds", t / second)
+    return "now"
+}
+
+function getTitle(text) {
+    return text.match(/(@info\r?\n)?[ \t\r\n]*(.*)/)[2]
+}
+
+function searchCards(cards, q) {
+    var searchAll = false
+    if (q.match(/^:/)) {
+        searchAll = true
+        q = q.slice(1)
+    }
+    var REs = map(q.split(/\s+/), function (q) { return new RegExp(q, "i") })
+    
+    function scoreCard(card) {
+        if (!searchAll && card.showTime >= inf) {
+            return -1
+        }
+        var allMatch = true
+        var titleMatches = 0
+        var title = getTitle(card.text)
+        foreach(REs, function (re) {
+            if (!card.text.match(re)) {
+                allMatch = false
+                return false
+            }
+            if (title.match(re)) {
+                titleMatches++
+            }
+        })
+        if (!allMatch)
+            return -1
+        
+        return titleMatches + (1.0 / title.length)
+    }
+    
+    var x = []
+    foreach(cards, function (c) {
+        var score = scoreCard(c)
+        if (score >= 0) {
+            x.push({
+                card : c,
+                score : score
+            })
+        }
+    })
+    x.sort(function (a, b) { return b.score - a.score })
+    x = map(x, function (x) { return x.card })
+    return x
+}
 
 function createSmallCardDiv(card) {
     var text = card.text
     var orig = text
     
-    text = text.match(/(@info\r?\n)?[ \t\r\n]*(.*)/)[2]
+    text = getTitle(text)
     if (text.length > 30) {
         text = text.substring(0, 27) + "..."
     }
     text = text.replace(/\s+/g, " ")    
     
     if (card != model.cards[0]) {
-        var div = $('<div class="small-card" title="' + escapeXML(orig) + '"></div>')
+        var div = $('<div class="small-card"></div>')
     } else {
-        var div = $('<div class="current-small-card" title="' + escapeXML(orig) + '"></div>')
+        var div = $('<div class="current-small-card" title="' + escapeXml(orig) + '"></div>')
     }
     if (text.match(/\S/))
         div.text(text)
@@ -63,6 +141,37 @@ function addNewCard() {
     $('#current-card').focus()
 }
 
+function goToCard() {
+    var textarea = $('textarea:focus').get()[0]
+    if (textarea) {
+        var s = ""
+        if (textarea.selectionStart != textarea.selectionEnd) {
+            s = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
+        } else {
+            for (var start = textarea.selectionStart; start >= 0; start--) {
+                if (!textarea.value[start].match(/\w| /)) {
+                    start++
+                    break
+                }
+            }
+            for (var end = textarea.selectionStart; end < textarea.value.length; end++) {
+                if (!textarea.value[end].match(/\w| /)) {
+                    end--
+                    break
+                }
+            }
+            s = textarea.value.substring(start, end)
+        }
+        
+        if (s) {
+            var cs = searchCards(model.cards, s)
+            if (cs.length > 0) {
+                openCard(cs[0])
+            }
+        }
+    }
+}
+
 function openCard(card) {
     card.touchTime = time()
     refresh()
@@ -79,7 +188,7 @@ function getUpcoming() {
         if (d != 0) return d
         d = b.createTime - a.createTime
         if (d != 0) return d
-        return strcmp(a.text, b.text)
+        return compare(a.text, b.text)
     })
     foreach(cards, function (card) {
         if (card.showTime <= now)
@@ -212,7 +321,7 @@ function refresh() {
     $('#showTime').text("showtime: " + englishTimeSpan(showTime))
     $('#urls').empty()
     foreach(currentCard.text.match(/https?:\/\/\S+/g), function (url) {
-        $('#urls').append('<div><a target="_blank" href="' + escapeXML(url) + '">' + escapeXML(url.length > 40 ? (url.substring(0, 40) + '...') : url) + '</a></div>')
+        $('#urls').append('<div><a target="_blank" href="' + escapeXml(url) + '">' + escapeXml(url.length > 40 ? (url.substring(0, 40) + '...') : url) + '</a></div>')
         return false // just do first url for now
     })
     
@@ -222,7 +331,7 @@ function refresh() {
         editCard($("#current-card"), currentCard)
     }
 
-    addCards($('#recent-cards'), model.cards.slice(0, 8))
+    addCards($('body', $('#recent-cards').contents()), model.cards.slice(0, 8))
     
     var upcoming = getUpcoming()
     
@@ -230,52 +339,31 @@ function refresh() {
     addCards($('body', $('#upcoming2-cards').contents()), upcoming[1])
     addCards($('body', $('#upcoming3-cards').contents()), upcoming[2])
     
-    var searchCards = []
     var q = $('#search-query').val()
-    if (q) {
-        var searchAll = false
-        if (q.match(/^:/)) {
-            searchAll = true
-            q = q.slice(1)
-        }
-        searchCards = filter(model.cards, function (card) {
-            if (!searchAll && card.showTime == Infinity) {
-                return false
-            }
-            var allMatch = true
-            foreach(q.split(/\s+/), function (qq) {
-                if (!card.text.match(new RegExp(qq, "i"))) {
-                    allMatch = false
-                    return false
-                }
-            })
-            return allMatch
-        })
-    }
-    addCards($('#search-cards'), searchCards)
+    addCards($('body', $('#search-cards').contents()), q ? searchCards(model.cards, q) : [])
     
     // calendar stuff
     var calCards = []
     foreach(model.cards, function (card) {
-        if (card.showTime == Infinity)
+        if (card.showTime >= inf)
             return
         var m = card.text.match(/@cal(.*)/)
         if (m) {
             calCards.push({
-                cal : m[1],
+                cal : trim(m[1]),
                 card : card
             })
         }
     })
     for (var i = 0; i < 7; i++) {
         var day = now + (i * 1000 * 60 * 60 * 24)
-        var m = ("" + new Date(day)).replace(/0+([1-9])/g, '$1').match(/(\S+) (\S+ \S+)/)
+        day = ("" + new Date(day)).replace(/0+([1-9])/g, '$1').match(/\S+ \S+ \S+/)[0]
         var div = $('<div style="width:100%"></div>')
-        $('#day-' + (i + 1)).empty().append($('<span></span>').text(m[0])).append(div)
+        $('#day-' + (i + 1)).empty().append($('<span></span>').text(day)).append(div)
         
         var dayCards = []
         foreach(calCards, function (calCard) {
-            if (calCard.cal.match(new RegExp(m[1], "i")) || calCard.cal.match(new RegExp(m[2], "i"))) {
+            if (!find(calCard.cal.match(/\S+/g), function (s) { return !day.match(new RegExp(s, "i")) })) {
                 dayCards.push(calCard.card)
             }
         })
@@ -326,6 +414,10 @@ function grabFromGMail(button, username, password) {
     })
 }
 
+function reportSize(size, cardCount) {
+    $('#size').text(sprintf("%0.1fkb, %d", size / 1024, cardCount))
+}
+
 $(function () {
     $('body').ajaxError(function (_, s) {
         var err = s.responseText
@@ -360,12 +452,16 @@ $(function () {
                 e.preventDefault()
                 addNewCard()
             }
+            if (e.metaKey && (e.keyCode == 70)) {
+                e.preventDefault()
+                $('#search-query').focus().select()
+            }
             if (e.metaKey && (e.keyCode == 71)) {
                 e.preventDefault()
-                // go to card
+                goToCard()
             }
-        })    
-    
+        })
+
         function createOnChangeHandler(saveCallback, time) {
             var self = {
                 dirty : false,
@@ -394,6 +490,8 @@ $(function () {
             if (password)
                 data = encrypt(data, password)
 
+            reportSize(data.length, model.cards.length)
+            
             $.ajax({
                 type: 'POST',
                 url: '/api/save',
@@ -431,6 +529,14 @@ $(function () {
         
         $('#search-query').keydown(function (e) {
             if (e.keyCode == 13) {
+                var s = $('#search-query').val()                
+                if (s) {
+                    var cs = searchCards(model.cards, s)
+                    if (cs.length > 0) {
+                        openCard(cs[0])
+                        return
+                    }
+                }
                 refresh()
             }
         })
@@ -453,6 +559,18 @@ $(function () {
                 grabFromGMail($(this), a.username, a.password)
             })).append(username).append(password)
             gmail.append(div)
+        })
+        
+        // purge stuff
+        $('#purge').click(function () {
+            var removeCount = 0
+            model.cards = filter(model.cards, function (e) {
+                var ret = e.showTime < inf
+                if (!ret) removeCount++
+                return ret
+            })
+            onChange()
+            alert("purged " + removeCount + " cards")
         })
     }
     
@@ -518,9 +636,11 @@ $(function () {
                 cards : [newCard()],
                 workingCard : newCard()
             }
+            reportSize(data.length, model.cards.length)
             load()
         } else if (data.match(/^[\(\{\[]/)) {
             model = eval('(' + data + ')')
+            reportSize(data.length, model.cards.length)
             load()
         } else {
             // it's encrypted...
@@ -534,6 +654,7 @@ $(function () {
                         setTimeout(tryToOpen, 0)
                         return
                     }
+                    reportSize(data.length, model.cards.length)
                     load()
                 })
             }
@@ -592,9 +713,11 @@ $(function () {
                 <tr><td>
                     <button id="save">save</button>
                     <button id="eval">eval</button>
+                    <small><span id="size">size</span></small>
+                    <button id="purge">purge</button>
                 </td></tr>
                 <tr style="height:100%"><td>
-                    <textarea class="fill" id="working-card" onkeydown="checkTab(event)">hello</textarea>
+                    <textarea class="fill" id="working-card">hello</textarea>
                 </td></tr>
                 <tr><td>
                     <div id="gmail"></div>
@@ -616,14 +739,15 @@ $(function () {
                         <button onclick="postpone(14 * 24 * 60 * 60 * 1000, true)">2w</button>
                         <button onclick="postpone(30 * 24 * 60 * 60 * 1000, true)">m</button>
                         <button onclick="postpone(2 * 30 * 24 * 60 * 60 * 1000, true)">2m</button>
+                        <button onclick="postpone(4 * 30 * 24 * 60 * 60 * 1000, true)">4m</button>
                         <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
-                        <button onclick="postpone(Infinity)">&#8734;</button>
+                        <button onclick="postpone(inf)">&#8734;</button>
                     </div>
                     <div id="urls"></div>
                     <div id="current-card-passwords"></div>
                 </td></tr>
                 <tr style="height:100%"><td>
-                    <textarea class="fill" id="current-card" onkeydown="checkTab(event)">hello</textarea>
+                    <textarea class="fill" id="current-card">hello</textarea>
                 </td></tr>
                 <tr><td>
                 </td></tr>
@@ -631,15 +755,22 @@ $(function () {
         </td>
         <td>
             <table border="1" class="fill">
-                <tr>
-                    <td style="width:50%" id="recent-cards" valign="top">
+                <tr style="height:25%">
+                    <td style="width:50%" valign="top">
+                        <iframe frameBorder="0" id="recent-cards" class="fill" src="cardHolder.html"></iframe>
                     </td>
                     <td style="width:50%" valign="top">
-                        <input style="width:100%"id="search-query" type="text"/>
-                        <div id="search-cards" style="width:100%"/>
+                        <table class="fill">
+                            <tr><td>
+                                <input style="width:100%"id="search-query" type="text"/>
+                            </td></tr>
+                            <tr style="height:100%"><td>
+                                <iframe frameBorder="0" id="search-cards" class="fill" src="cardHolder.html"></iframe>
+                            </td></tr>
+                        </table>
                     </td>
                 </tr>                            
-                <tr style="height:100%">
+                <tr style="height:75%">
                     <td valign="top">
                         <iframe frameBorder="0" id="upcoming1-cards" class="fill" src="cardHolder.html"></iframe>
                     </td>

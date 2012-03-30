@@ -1,1216 +1,230 @@
-// unless otherwise stated (above a function definition)
-// these functions were written by myself, Greg Little,
-// and I release them into the public domain.
+//
+// license:
+// 
+// sprintf function:
+//      - http://creativecommons.org/licenses/by/2.0/uk/
+//
+// jsonPath function
+//      - MIT License (Stefan Goessner)
+//
+// json2 stuff
+//      - public domain
+//
+// stuff that says it's from some web url has whatever license that url says
+//
+// everything else:
+//      - public domain
 
-function strcmp(a, b) {
-    return (b < a) - (a < b)
-}
+////////////////////////////
+// misc
 
-function englishTimeSpan(t) {
-    var second = 1000
-    var minute = second * 60
-    var hour = minute * 60
-    var day = hour * 24
-    var week = day * 7
-    var month = day * 30
-    var year = day * 365
-    // years
-    if (t == Infinity)
-        return "never"
-    if (t / year >= 1)
-        return sprintf("%0.1f years", t / year)
-    if (t / month >= 1)
-        return sprintf("%0.1f months", t / month)
-    if (t / week >= 1)
-        return sprintf("%0.1f weeks", t / week)
-    if (t / day >= 1)
-        return sprintf("%0.1f days", t / day)
-    if (t / hour >= 1)
-        return sprintf("%0.1f hours", t / hour)
-    if (t / minute >= 1)
-        return sprintf("%0.1f minutes", t / minute)
-    if (t / second >= 1)
-        return sprintf("%0.0f seconds", t / second)
-    return "now"
-}
-
-function pairs(a) {
-    var b = []
+pairs = function (a) {
+    var p = []
     foreach(a, function (v, k) {
-        b.push([k, v])
+        p.push([k, v])
     })
-    return b
+    return p
 }
 
-function sortedPairs(a, func) {
-    a = pairs(a)
-    if (!func) func = function (a, b) {return a - b}
-    a.sort(function (a, b) {return func(a[0], b[0])})
-    return a
-}
+// from http://stackoverflow.com/questions/1293147/javascript-code-to-parse-csv-data
+unCsv = function ( strData, strDelimiter ){
+    strDelimiter = (strDelimiter || ",");
+    var objPattern = new RegExp(
+        (
+            "(\\" + strDelimiter + "|\\r?\\n|\\r|^)" +
+            "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" +
+            "([^\"\\" + strDelimiter + "\\r\\n]*))"
+        ),
+        "gi"
+    );
 
-function hist(x, y) {
-    if (!y) {
-        if (x instanceof Array) {
-            return hist(map(x, function (e) {return e[0]}), map(x, function (e) {return e[1]}))
+    var arrData = [[]];
+    var arrMatches = null;
+
+    while (arrMatches = objPattern.exec( strData )){
+        var strMatchedDelimiter = arrMatches[ 1 ];
+        if (strMatchedDelimiter.length &&
+            (strMatchedDelimiter != strDelimiter)) {
+            arrData.push( [] );
+        }
+        if (arrMatches[ 2 ]){
+            var strMatchedValue = arrMatches[ 2 ].replace(
+                new RegExp( "\"\"", "g" ),
+                "\""
+            );
         } else {
-            return hist(keys(x), values(x))
+            var strMatchedValue = arrMatches[ 3 ];
         }
+        arrData[ arrData.length - 1 ].push( strMatchedValue );
     }
-    var yMax = getMax(y)
-    return "http://chart.apis.google.com/chart?cht=bvs&chs=170x125&chd=t:" + y + "&chco=4d89f9&chds=0," + yMax + "&chxt=x,y&chxr=1,0," + yMax + "&chxl=0:|" + x.join('|') + "|&chbh=a"
+    return( arrData );
 }
 
-function group(a, func) {
-    var m = {}
-    foreach(a, function (e) {
-        var key = func(e)
-        var arr = m[key]
-        if (!arr) {
-            arr = []
-            m[key] = arr
-        }
-        arr.push(e)
-    })
-    return m
-}
-
-function prune(o, depth) {
-    if (depth === undefined) depth = 1
-    if (o instanceof Array) {
-        var newO = []
-    } else {
-        var newO = {}
-    }
-    if (depth > 0) {
-        foreach(o, function (v, k) {
-            if ((typeof v) == "object") {
-                v = prune(v, depth - 1)
-            }
-            newO[k] = v
-        })
-    }
-    return newO
-}
-
-// adapted from: http://www.tecgraf.puc-rio.br/~mgattass/color/HSVtoRGB.htm
-// inputs are between 0 and 1,
-// output are between 0 and 1
-function HSVtoRGB(h, s, v, color) {
-    if (!color) {
-        color = {}
-    }
-    if (s == 0) {
-        color.r = v
-        color.g = v
-        color.b = v
-    } else {
-        var_h = h * 6
-        var_i = Math.floor(var_h)
-        var_1 = v * (1 - s)
-        var_2 = v * (1 - s * (var_h - var_i))
-        var_3 = v * (1 - s * (1 - (var_h - var_i)))
-        
-        if (var_i == 0) {color.r = v; color.g = var_3; color.b = var_1}
-        else if (var_i == 1) {color.r = var_2; color.g = v; color.b = var_1}
-        else if (var_i == 2) {color.r = var_1; color.g = v; color.b = var_3}
-        else if (var_i == 3) {color.r = var_1; color.g = var_2; color.b = v}
-        else if (var_i == 4) {color.r = var_3; color.g = var_1; color.b = v}
-        else {color.r = v; color.g = var_1; color.b = var_2}
-    }
-    return color
-}
-
-function assert(yes) {
-    if (!yes) {
-        throw "assertion failure"
-    }
-}
-
-// example: randomId(5, /[0-9a-z]/) --> 7hy9s
-function randomId(length, regex) {
-    if (typeof regex == "string") {
-        var s = ""
-        while (s.length < length) {
-            s += pickRandom(regex)
-        }
-        return s
-    }
-    var s = ""
-    while (s.length < length) {
-        var c = String.fromCharCode(randomIndex(256))
-        if (regex.exec(c)) {
-            s += c
-        }
-    }
-    return s
-}
-
-// adapted from: http://www.webreference.com/js/column8/functions.html
-/*
-   name - name of the cookie
-   value - value of the cookie
-   [days] - expiration date of the cookie (measured in days from now)
-     (defaults to end of current session)
-   [path] - path for which the cookie is valid
-     (defaults to path of calling document)
-   [domain] - domain for which the cookie is valid
-     (defaults to domain of calling document)
-   [secure] - Boolean value indicating if the cookie transmission requires
-     a secure transmission
-   * an argument defaults when it is assigned null as a placeholder
-   * a null placeholder is not required for trailing omitted arguments
-*/
-function setCookie(name, value, days, path, domain, secure) {
-	if (days) {
-		var date = new Date();
-		date.setTime(date.getTime()+(days*24*60*60*1000));
-		var expires = date
-	}
-  var curCookie = name + "=" + escape(value) +
-      ((expires) ? "; expires=" + expires.toGMTString() : "") +
-      ((path) ? "; path=" + path : "") +
-      ((domain) ? "; domain=" + domain : "") +
-      ((secure) ? "; secure" : "");
-  document.cookie = curCookie;
-}
-/*
-  name - name of the desired cookie
-  return string containing value of specified cookie or null
-  if cookie does not exist
-*/
-function getCookie(name) {
-  var dc = document.cookie;
-  var prefix = name + "=";
-  var begin = dc.indexOf("; " + prefix);
-  if (begin == -1) {
-    begin = dc.indexOf(prefix);
-    if (begin != 0) return null;
-  } else
-    begin += 2;
-  var end = document.cookie.indexOf(";", begin);
-  if (end == -1)
-    end = dc.length;
-  return unescape(dc.substring(begin + prefix.length, end));
-}
-/*
-   name - name of the cookie
-   [path] - path of the cookie (must be same as path used to create cookie)
-   [domain] - domain of the cookie (must be same as domain used to
-     create cookie)
-   path and domain default if assigned null or omitted if no explicit
-     argument proceeds
-*/
-function deleteCookie(name, path, domain) {
-  if (getCookie(name)) {
-    document.cookie = name + "=" +
-    ((path) ? "; path=" + path : "") +
-    ((domain) ? "; domain=" + domain : "") +
-    "; expires=Thu, 01-Jan-70 00:00:01 GMT";
-  }
-}
-
-
-
-
-function lines(s) {
-    return s.split(/\r?\n/)
-}
-
-// set functions
-
-/**
-	Creates a set from an array of values;
-	all the values become keys in an object,
-	and the corresponding value is "true"
- */
-function Set(a) {
-	if (a) {
-    	this.add(a)
-    }
-}
-
-/**
-	Returns a clone of the Set.
- */
-Set.prototype.clone = function () {
-    return new Set(keys(this))
-}
-
-/**
-	Removes all the elements in array <code>k</code>,
-	or keys in the set <code>k</code>,
-	or the element <code>k</code>.
-	
-	Returns this Set, after the removal.
-	If removing a single element, returns <code>true</code> iff the element existed before.
- */
-Set.prototype.remove = function (k) {
-    if ((typeof k) == "object") {
-        if (k instanceof Array) {
-            var me = this
-            foreach(k, function (kk) {
-                delete me[kk]
-            })
-        } else {
-            var me = this
-            foreach(k, function (v, kk) {
-                delete me[kk]
-            })
-        }
-    } else {
-        if (!this[k]) return false
-        delete this[k]
-        return true
-    }
-    return this
-}
-
-/**
-	Adds all the elements in array <code>k</code>,
-	or keys in the set <code>k</code>,
-	or the element <code>k</code>.
-	
-	Returns this Set, after the addition.
-	If adding a single element, returns <code>true</code> iff the element didn't exist before.
- */
-Set.prototype.add = function (k) {
-    if ((typeof k) == "object") {
-        if (k instanceof Array) {
-            var me = this
-            foreach(k, function (kk) {
-                me[kk] = true
-            })
-        } else {
-            var me = this
-            foreach(k, function (v, kk) {
-                me[kk] = true
-            })
-        }
-    } else {
-        if (this[k]) return false
-        this[k] = true
-        return true
-    }
-}
-
-/**
-	Returns a new Set representing the intersection of this Set with
-	all the elements in array <code>k</code>,
-	or keys in the set <code>k</code>,
-	or the element <code>k</code>.
- */
-Set.prototype.intersect = function (b) {
-    var i = new Set()
-    if ((typeof b) == "object") {
-        if (b instanceof Array) {
-            var me = this
-            foreach(b, function (k) {
-                if (me[k]) i[k] = true
-            })
-        } else {
-            var me = this
-            foreach(b, function (v, k) {
-                if (me[k]) i[k] = true
-            })
-        }
-    } else {
-        return this.intersect([b])
-    }
-    return i
-}
-
-
-function makeSet(a) {
-    var s = {}
-    foreach(a, function (v) { s[v] = 1 })
-    return s
-}
-function setClone(a) {
-    var s = {}
-    foreach(a, function (v, k) { s[k] = 1 })
-    return s
-}
-function setRemove(a, b) {
-    foreach(b, function (v, k) {
-        delete a[k]
-    })
-    return a
-}
-setSub = setRemove
-function setAdd(a, b) {
-    if ((typeof b) == "object") {
-        foreach(b, function (v, k) {
-            a[k] = 1
-        })
-        return a
-    } else {
-        if (a[b]) return false
-        a[b] = 1
-        return true
-    }
-}
-function setIntersect(a, b) {
-    var counts = setClone(a)
-    foreach(b, function (v, k) { bagAdd(counts, k) })
-    return map(filter(counts, function (v, k) { return v == 2 }), function () { return 1 })
-}
-
-function bagGet(bag, key) {
-    if (bag[key] == null) {
-        return 0
-    }
-    return bag[key]
-}
-
-function bagAdd(bag, key, amount) {
-    if (!amount) amount = 1
-    if ((typeof key) == "object") {
-        foreach(key, function (v, k) {
-            bagAdd(bag, k, v * amount)
-        })
-    } else {
-        bag[key] = bagGet(bag, key) + amount
-    }
-    return bag
-}
-
-function bag(values) {
-    var b = {}
-    foreach(values, function (value) {
-        bagAdd(b, value)
-    })
-    return b
-}
-makeBag = bag
-
-
-/**
-	Returns a new Bag data structure,
-	which is an unordered collection of objects,
-	where objects can appear multiple times.
-	The bag is really a map of keys,
-	where the value associated with each key
-	represents the number of times that key appears in the bag.
-	
-	If <code>a</code> is a bag, add it's elements to this bag.
-	If <code>a</code> is an object, add it's values to this bag.
-	If <code>a</code> is an element, add it to this bag.
- */
-function Bag(a) {
-	if (a) {
-		this.add(a)
-	}
-}
-
-/**
-	Returns a clone of the bag.
- */
-Bag.prototype.clone = function () {
-    return new Bag(this)
-}
-
-/**
-	If <code>a</code> is a bag, add it's elements to this bag, and returns the new bag.
-	If <code>a</code> is an object, add it's values to this bag, and returns the new bag.
-	If <code>a</code> is an element, add it to this bag, and return the new number of times it appears.
-	
-	The parameter <code>count</code> defaults to 1,
-	but can be changed to add multiple copies of <code>a</code> to the bag.
- */
-Bag.prototype.add = function (a, count) {
-	if (count === undefined) count = 1
-	if ((typeof a) == "object") {
-		var me = this
-		if (a instanceof Bag) {
-			foreach(a, function (v, a) {
-				me.add(a, v * count)
-			})
-		} else {
-			foreach(a, function (a) {
-				me.add(a, count)
-			})
-		}
-	} else {
-		var v = this[a]
-		if (!v) v = 0
-		v += count
-		this[a] = v
-		return v
-	}
-	return this
-}
-
-Bag.prototype.get = function (a) {
-    var v = this[a]
-    if (!v) v = 0
-    return v
-}
-
-Bag.prototype.pairs = function () {
-    var a = []
-    foreach(this, function (count, key) {
-        a.push([key, count])
-    })
-    return a
-}
-
-Bag.prototype.sortedPairs = function () {
-    var a = this.pairs()
-    a.sort(function (a, b) {return b[1] - a[1]})
-    return a
-}
-
-// adapted from http://jsfromhell.com/en/number/base-conversor
-function toBase(n, b, c) {
-    var s = ""
-    if (b > (c = (c || "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz").split("")).length || b < 2) return "";
-    while(n)
-        s = c[n % b] + s, n = Math.floor(n / b);
-    return s;
-}
-
-var __profile_block_stack = [{}]
-var __profile_name_stack = ["__root__"]
-function profile(name) {
-    if (!name) {
-        function convert(block) {
-            return map(filter(block, function (prop, key) {
-                if (key == "total") return true
-                if (typeof prop == "object") return true
-                return false
-            }), function (prop, key) {
-                if (key == "total") return prop / 1000
-                return convert(prop)
-            })
-        }
-        output(json(convert(__profile_block_stack)))
-        __profile_block_stack = [{}]
-        __profile_name_stack = ["__root__"]
-        return
-    }
+gaussian = function (x, mean, stdDev) {
+    if (mean == null) mean = 0
+    if (stdDev == null) stdDev = 1
     
-    var topBlock = last(__profile_block_stack)
-    var topName = last(__profile_name_stack)
-    if (name != topName) {
-        if (!topBlock[name]) {
-            topBlock[name] = {total : 0}
-        }
-        topBlock[name].begin = time()
-        __profile_block_stack.push(topBlock[name])
-        __profile_name_stack.push(name)
-    } else {
-        topBlock.total += time() - topBlock.begin
-        __profile_block_stack.pop()
-        __profile_name_stack.pop()
-    }
+    var d = x - mean
+    var v = stdDev * stdDev
+    return (1/Math.sqrt(2 * Math.PI * v)) * Math.exp(-(d * d) / (2 * v))
 }
 
-function stringCompare(a, b) {
+ensure = function () {
+    if (arguments.length <= 3) {
+        if (!(arguments[1] in arguments[0])) {
+            arguments[0][arguments[1]] = arguments[2]
+        }
+        return arguments[0][arguments[1]]
+    }
+    var args = Array.prototype.slice.call(arguments)
+    var prev = ensure.apply(null, args.slice(0, 2).concat([typeof(args[2]) == "string" ? {} : []]))
+    return ensure.apply(null, [prev].concat(args.slice(2)))
+}
+
+makeSet = function (o) {
+    var s = {}
+    foreach(o, function (e) { s[e] = true })
+    return s
+}
+
+setTimeoutRepeat = function (func, interval) {
+    setTimeout(function () {
+        func()
+        setTimeoutRepeat(func, interval)
+    }, interval)
+}
+
+cap = function (t, t0, t1) {
+    if (t < t0)
+        return t0
+    if (t > t1)
+        return t1
+    return t
+}
+
+lerpCap = function (t0, v0, t1, v1, t) {
+    var t = cap(t, t0, t1)
+    return (t - t0) * (v1 - v0) / (t1 - t0) + v0
+}
+
+lerp = function (t0, v0, t1, v1, t) {
+    return (t - t0) * (v1 - v0) / (t1 - t0) + v0
+}
+
+trim = function (s) {
+    return s.replace(/^\s+|\s+$/g,"");
+}
+
+values = function (obj) {
+    var a = []
+    foreach(obj, function (e) {a.push(e)})
+    return a
+}
+
+keys = function (obj) {
+    var a = []
+    foreach(obj, function (v, k) {a.push(k)})
+    return a
+}
+
+compare = function (a, b) {
     if (a < b) return -1
-    if (b < a) return 1
+    if (a > b) return 1
     return 0
 }
 
-function chickenfoot_jQuery() {
-    if ((typeof $) != undefined) return
-    var body = document.wrappedJSObject.getElementsByTagName('body').item(0)
-    var div = document.createElement('div')
-    div.innerHTML = '<script src="http://localhost/js/jquery.js"></script>'
-    body.appendChild(div)
-    $ = window.wrappedJSObject.$
+lines = function (s) {
+    return s.split(/\r?\n/)
 }
 
-// adapted from: http://kevin.vanzonneveld.net/techblog/article/javascript_equivalent_for_phps_levenshtein/
-function editDistance( str1, str2 ) {
-    // http://kevin.vanzonneveld.net
-    // +   original by: Carlos R. L. Rodrigues (http://www.jsfromhell.com)
-    // +   bugfixed by: Onno Marsman
-    // *     example 1: levenshtein('Kevin van Zonneveld', 'Kevin van Sommeveld');
-    // *     returns 1: 3
- 
-    var s, l = (s = (str1+'').split("")).length, t = (str2 = (str2+'').split("")).length, i, j, m, n;
-    if(!(l || t)) return Math.max(l, t);
-    for(var a = [], i = l + 1; i; a[--i] = [i]);
-    for(i = t + 1; a[0][--i] = i;);
-    for(i = -1, m = s.length; ++i < m;){
-        for(j = -1, n = str2.length; ++j < n;){
-            a[(i *= 1) + 1][(j *= 1) + 1] = Math.min(a[i][j + 1] + 1, a[i + 1][j] + 1, a[i][j] + (s[i] != str2[j]));
-        }
-    }
-    return a[l][t];
-}
-editDist = editDistance
-
-function nameDist(a, b) {
-    var a = a.split(/\s+/)
-    var b = b.split(/\s+/)
-    b.push('')
-    var dist = 0
-    foreach(a, function (aName) {
-        var o = getMinObj(b, function (bName) {
-            var dist = editDist(aName, bName)
-            if (aName.substring(0, 1) != bName.substring(0, 1)) {
-                dist += 4
-            }
-            if (dist >= 4) dist += 20
-            return dist
-        })
-        dist += o.s
-    })
-    return dist
-}
-
-// got this idea from somewhere (including the name "klass"),
-// but I forget where
-function klass(o) {
-    var self = function () {
-        if (self.prototype.__init__) {
-            self.prototype.__init__()
-        }
-    }
-    foreach(o, function (func, key) {
-        self.prototype[key] = func
-    })
-    return self
-}
-
-function mySplit(s, sep) {
-    if (emptyString(s)) return []
-    return s.split(sep)
-}
-
-function emptyString(s) {
-    return !s || s.match(/^\s*$/)
-}
-
-function my_output(s) {
-    try {
-        console.log(s)
-        return
-    } catch (e) {
-    }
-    try {
-        Packages.java.lang.System.out.print(s)
-        return
-    } catch (e) {
-    }
-    try {
-        alert(s)
-        return
-    } catch (e) {
-    }
-    throw "trying to output: " + s
-}
-if ((typeof output) == "undefined") {
-    output = my_output
-}
-function outputln(s) {
-    output(s + '\n')
-}
-
-function globalMatch(re, s, num) {
-    if (s instanceof RegExp) {
-        return globalMatch(s, re, num)
-    }
-
-    if (num) {
-        var ret = []
-        var m
-        while (m = re.exec(s)) {
-            ret.push(m[num])
-            if (!re.global) break
-        }
-        return ret
-    }
-
-    var ret = []
-    var m
-    var leftAccum = ''
-    while (m = re.exec(s)) {
-        m.left = leftAccum + RegExp.leftContext
-        m.right = RegExp.rightContext    
-        ret.push(m)
-        
-        if (m[0] == '') {
-            leftAccum += s.substring(0, 1)
-            s = s.substring(1)
-        }
-        
-        if (!re.global) break
-    }
-    return ret
-}
-matchGlobal = globalMatch
-
-// add objB to objA
-function merge(objA, objB) {
+merge = function (objA, objB) {
     foreach(objB, function (v, k) {
         objA[k] = v
     })
     return objA
 }
 
-function pickRandom(obj) {
-    if (obj instanceof Array) {
-        return obj[randomIndex(obj.length)]
-    } else {
-        return obj[pickRandom(keys(obj))]
-    }
-}
-pick = pickRandom
-
-function link(name, url) {
-    return '<a href="' + escapeXml(url) + '">' + escapeXml(name) + '</a>'
-}
-
-function foreachRandom(a, test) {
-    if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        foreach(shuffle(range(0, a.length - 1)), function (i) {
-            if (test(a[i], i) == false) return false
-        })
-    } else {
-        foreach(shuffle(keys(a)), function (k) {
-            if (test(a[k], k) == false) return false
-        })
-    }
-}
-forEachRandom = foreachRandom
-
-function range(min, max) {
-    var a = []
-    for (var i = min; i <= max; i++) {
-        a.push(i)
-    }
-    return a
-}
-
-function jaxer_jsdb(q) {
-    var s = new Jaxer.Socket()
-    s.open('localhost', 52666)
-    s.writeString(q.length + "\n" + q);
-    s.flush()
-    
-    var ret = []
-    var chunk = null
-    while (chunk = s.readString(256)) {
-        ret.push(chunk)
-    }
-    
-    return ret.join('')
-}
-
-function time() {
+time = function () {
     return new Date().getTime()
 }
 
-function addUrlParam(url, key, value) {
-    if (!url.match(/\?/)) { url += "?" } else { url += "&" }
-    return url + escapeURL(key) + "=" + escapeURL(value)
+getFragment = function (url) {
+    if (url === undefined) {
+        url = window.location.href
+    }
+    var m = url.match(/#(.*)/)
+    return m ? m[1] : ""
 }
 
-function csv(val, comma) {
-    if (!comma) comma = ','
-    if (typeof val == "object") {
-        outterObject = false
-        for (k in val) {
-            var first = val[k]
-            if (typeof first == "object") {
-                if (!(first instanceof Array)) {
-                    var headers = {}
-                    foreach(val, function (row) {
-                        foreach(keys(row), function (header) {
-                            headers[header] = 1
-                        })
-                    })
-                    headers = keys(headers)
-                    return csv(headers, comma) + "\n" + csv(map(val, function (row) {
-                        return map(headers, function (header) {
-                            return row[header]
-                        })
-                    }), comma)
-                }
-                outterObject = true
+setFragment = function (frag) {
+    url = window.location.href
+    url = url.replace(/(#[^#]*)?$/, '#' + frag)
+    window.location.href = url
+}
+
+getUrlParams = function (url) {
+    if (url === undefined) {
+        url = window.location.href
+    }
+    var params = {}
+    var m = url.match(/\?([^#]+)/)
+    if (m) {
+        foreach(m[1].split(/&/), function (m) {
+            if (m.length > 0) {
+                var a = m.split(/=/)
+                params[unescapeUrl(a[0])] = a.length > 1 ? unescapeUrl(a[1]) : true
             }
-            break
-        }
-        if (outterObject) {
-            return map(val, function (v) { return csv(v, comma) }).join('\n')
-        } else {        
-            return map(val, function (v) { return csv(v, comma) }).join(comma)
-        }
-    } else if (typeof val == "string") {
-        return '"' + val.replace(/"/g, '""') + '"'
-    } else {
-        if (val === null || val === undefined) {
-            return ''
-        }
-        return '' + val
+        })
     }
+    return params
 }
 
-function globalEval(___hguydnvuyyiiwtsmjhg___) {
-    return eval(___hguydnvuyyiiwtsmjhg___)
-}
+////////////////////////////
+// random
 
-// ensure("db.pima.cards", {})
-// ensure(null, "db.pima.cards", {})
-// ensure(db, "pima.cards", {})
-// ensure(db, ".pima.cards", {})
-// ensure(db, ["pima", "cards"], {})
-function ensure(obj, path, defaultValue) {
-    if (typeof obj == "string") {
-        return ensure(null, obj, path)
-    }
-    if (obj && (typeof path == "string") && path.match(/^[^\[\.]/)) {
-        return ensure(obj, '.' + path, defaultValue)
-    }
+var digitChars = "0123456789"
+var lowerChars = "abcdefghijklmnopqrstuvwxyz"
+var upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+randomIdentifier = function (size) {
+    var firstChars = '_' + lowerChars + upperChars
+    var nextChars = firstChars + digitChars
     
-    if (defaultValue == undefined) {
-        defaultValue = {}
+    var s = []
+    for (var i = 0; i < size; i++) {
+        var chars = i == 0 ? firstChars : nextChars
+        s.push(chars[randomIndex(chars.length)])
     }
-    
-    var so_far = obj ? "obj" : ""
-    if (typeof path == "string") {
-        var parts = path.match(/(^|\.)\w+|\[('(\\'|[^'])*'|"(\\"|[^"])*"|[^\]]+)\]/g)
-    } else {
-        var parts = map(path, function (part, i) { return (i == 0 && so_far == "") ? part : '[' + json(part) + ']' })
-    }
-    foreach(parts, function (part, i) {
-        so_far += part
-        if (eval("typeof " + so_far) == "undefined") {
-            if (i < parts.length - 1) {
-                if (parts[i + 1].match(/\[\d+\]/)) {
-                    eval(so_far + " = []")
-                } else {
-                    eval(so_far + " = {}")
-                }
-            } else {
-                eval(so_far + " = defaultValue")
-            }
-        }
-    })
-    return eval(so_far)
+    return s.join('')
 }
 
-// adapted from "parse" function at http://json.org/json.js
-function safeJson(s) {
-    var safeJson_re =/(\s+|[\(\)\{\}\[\]=:,]|'(\\\'|[^'])*'|"(\\\"|[^"])*"|[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?|function|var|data|return|true|false|undefined|null|\/\*(\*+[^\*\/]|[^\*])*\*+\/)+/
-    var m = s.match(safeJson_re)
-    return m && (m[0] == s)
-}
-
-function repeat(s, count) {
-    if (typeof s == "number") {
-        return repeat(count, s)
-    } else if (typeof s == "string") {
-        var list = []
-        for (var i = 0; i < count; i++) {
-            list.push(s)
-        }
-        return list.join('')
-    } else if (typeof s == "function") {
-        for (var i = 0; i < count; i++) {
-            s(i)
-        }
-    }
-}
-
-function deepClone(o) {
-    return eval(json(o))
-}
-
-function clone(o) {
-    if (typeof o == "object") {
-        if (o instanceof Array) {
-            return o.slice(0)
-        }
-    }
-    throw "clone error: unsupported type"
-}
-
-function gaussian(x, mean, stdDev) {
-    if (mean == null) mean = 0
-    if (stdDev == null) stdDev = 1
-    return Math.exp(-Math.pow(x - mean, 2) / (2 * Math.pow(stdDev, 2)))
-}
-
-// adapted from http://us.php.net/rand
-function randomGaussian(mean, stdDev) {
-    if (mean == null) mean = 0
-    if (stdDev == null) stdDev = 1
-    
-    var v = 2
-    while (v > 1) {
-        var u1 = Math.random()
-        var u2 = Math.random()
-        v = (2*u1 - 1) * (2*u1 - 1) +
-        (2*u2 - 1) * (2*u2 - 1)
-    }
-    ret = (2*u1 - 1) * Math.sqrt(-2*Math.log(v) / v)
-    return ret
-}
-
-function getMean(a) {
-    return getSum(a) / a.length
-}
-
-function getVariance(a, mean) {
-    if (mean == null) {
-        mean = getMean(a)
-    }
-    var s = 0
-    foreach(a, function (e) {s += Math.pow(e - mean, 2)})
-    return s / (a.length - 1)
-}
-
-function getStdDev(a, mean) {
-    return Math.sqrt(getVariance(a, mean))
-}
-
-function getStats(a) {
-    var mean = getMean(a)
-    var stdDev = getStdDev(a, mean)
-    return {mean : mean, stdDev: stdDev}
-}
-
-function swap(o, i1, i2) {
-    var temp = o[i1]
-    o[i1] = o[i2]
-    o[i2] = temp
-}
-
-function shuffle(a) {
-    for (var i = 0; i < a.length; i++) {
-        swap(a, i, randomIndex(a.length))
-    }
-    return a
-}
-
-function random(x, y) {
-    if (y == undefined) {
-        if (x == undefined) {
-            return Math.random()
-        }
-        return Math.floor(Math.random() * x)
-    }
-    return x + Math.floor(Math.random() * (y - x + 1))    
-}
-
-function randomIndex(n) {
+randomIndex = function (n) {
     return Math.floor(Math.random() * n)
 }
 
-function last(a, i) {
-    if (a.length == 0) return null
-    if (i == null) i = -1
-    i = i % a.length
-    if (i < 0) i += a.length
-    return a[i]
-}
-
-function setProp(obj, prop, otherObj) {
-    if (obj[prop] && (typeof obj[prop] == "object")) {
-        foreach(otherObj, function (v, k) {
-            obj[prop][k] = v
-        })
+pick = function (a) {
+    if (a instanceof Array) {
+        return a[randomIndex(a.length)]
     } else {
-        obj[prop] = otherObj
+        return a[pick(keys(a))]
     }
-}
-
-function values(obj) {
-    var a = []
-    foreach(obj, function (e) {a.push(e)})
     return a
 }
 
-function keys(obj) {
-    var a = []
-    foreach(obj, function (v, k) {a.push(k)})
-    return a
-}
-
-function getSum(a, test) {
-    if (test == null) {
-        test = function (v, k) {
-            return v
-        }
-    } else if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        var s = 0
-        for (var i = 0; i < a.length; i++) {
-            var v = a[i]
-            s += test(v, i)
-        }
-        return s
-    } else {
-        var s = 0
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                var v = a[k]
-                s += test(v, k)
-            }
-        }
-        return s
-    }
-}
-
-function find(a, test) {
-    if (test == null) {
-        test = function (v, k) {
-            return v
-        }
-    } else if (typeof test != "function") {
-        var testVal = test
-        test = function (v, k) {
-            return testVal == v
-        }
-    }
-    
-    if (a instanceof Array) {
-        for (var i = 0; i < a.length; i++) {
-            var v = a[i]
-            if (test(v, i)) {
-                return i
-            }
-        }
-        return -1
-    } else {
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                var v = a[k]
-                if (test(v, k)) {
-                    return k
-                }
-            }
-        }
-        return null
-    }
-}
-
-function getMinObj(a, test) {
-    if (test == null) {
-        test = function (v, k) {
-            return v
-        }
-    } else if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        var bestScore = null
-        var bestElement = null
-        var bestIndex = null
-        for (var i = 0; i < a.length; i++) {
-            var v = a[i]
-            var score = test(v, i)
-            if (bestElement == null || score < bestScore) {
-                bestScore = score
-                bestElement = v
-                bestIndex = i
-            }
-        }
-        return {e: bestElement, v: bestElement, i: bestIndex, k: bestIndex, s: bestScore}
-    } else {
-        var bestScore = null
-        var bestElement = null
-        var bestIndex = null
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                var v = a[k]
-                var score = test(v, k)
-                if (bestElement == null || score < bestScore) {
-                    bestScore = score
-                    bestElement = v
-                    bestIndex = k
-                }
-            }
-        }
-        return {e: bestElement, v: bestElement, i: bestIndex, k: bestIndex, s: bestScore}
-    }
-}
-
-function getMin(a, test) {
-    return getMinObj(a, test).e
-}
-
-function getMaxObj(a, test) {
-    if (test == null) {
-        test = function (v, k) {
-            return v
-        }
-    } else if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        var bestScore = null
-        var bestElement = null
-        var bestIndex = null
-        for (var i = 0; i < a.length; i++) {
-            var v = a[i]
-            var score = test(v, i)
-            if (bestElement == null || score > bestScore) {
-                bestScore = score
-                bestElement = v
-                bestIndex = i
-            }
-        }
-        return {e: bestElement, v: bestElement, i: bestIndex, k: bestIndex, s: bestScore}
-    } else {
-        var bestScore = null
-        var bestElement = null
-        var bestIndex = null
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                var v = a[k]
-                var score = test(v, k)
-                if (bestElement == null || score > bestScore) {
-                    bestScore = score
-                    bestElement = v
-                    bestIndex = k
-                }
-            }
-        }
-        return {e: bestElement, v: bestElement, i: bestIndex, k: bestIndex, s: bestScore}
-    }
-}
-
-function getMax(a, test) {
-    return getMaxObj(a, test).e
-}
-
-function filter(a, test) {
-    if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        var b = []
-        for (var i = 0; i < a.length; i++) {
-            var v = a[i]
-            if (test(v, i)) {
-                b.push(v)
-            }
-        }
-        return b
-    } else {
-        var b = {}
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                var v = a[k]
-                if (test(v, k)) {
-                    b[k] = v
-                }
-            }
-        }
-        return b
-    }
-}
-
-function forEach(a, test) {
-    if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        for (var i = 0; i < a.length; i++) {
-            if (test(a[i], i) == false) break
-        }
-    } else {
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                if (test(a[k], k) == false) break
-            }
-        }
+shuffle = function (a) {
+    for (var i = 0; i < a.length; i++) {
+        var ri = randomIndex(a.length)
+        var temp = a[i]
+        a[i] = a[ri]
+        a[ri] = temp
     }
     return a
 }
-foreach = forEach
 
-function map(a, test) {
-    if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        var b = []
-        for (var i = 0; i < a.length; i++) {
-            b.push(test(a[i], i))
-        }
-        return b
-    } else {
-        var b = {}
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                b[k] = test(a[k], k)
-            }
-        }
-        return b
-    }
-}
+////////////////////////////
+// escapeing
 
-function mapToSelf(a, test) {
-    if (typeof test == "string") {
-        var testString = test
-        test = function (v, k) {
-            var i = k
-            var e = v
-            return eval(testString)
-        }
-    }
-    if (a instanceof Array) {
-        for (var i = 0; i < a.length; i++) {
-            a[i] = test(a[i], i)
-        }
-        return a
-    } else {
-        for (var k in a) {
-            if (a.hasOwnProperty(k)) {
-                a[k] = test(a[k], k)
-            }
-        }
-        return a
-    }
-}
-
-function escapeUnicodeChar(c) {
+escapeUnicodeChar = function (c) {
     var code = c.charCodeAt(0)
     var hex = code.toString(16)
     if (code < 16) return '\\u000' + hex
@@ -1219,7 +233,7 @@ function escapeUnicodeChar(c) {
     return '\\u' + hex
 }
 
-function escapeString(s) {
+escapeString = function (s) {
     return s.
         replace(/\\/g, '\\\\').
         replace(/\t/g, '\\t').
@@ -1230,11 +244,176 @@ function escapeString(s) {
         replace(/[\u0000-\u001F]|[\u0080-\uFFFF]/g, escapeUnicodeChar)
 }
 
-function escapeRegex(s) {
+escapeRegex = function (s) {
     return escapeString(s).replace(/([\{\}\(\)\|\[\]\^\$\.\*\+\?])/g, "\\$1")
 }
 
-function my_json(o) {
+escapeUrl = function (s) {
+    return encodeURIComponent(s)
+}
+
+unescapeUrl = function (s) {
+    return decodeURIComponent(s.replace(/\+/g, "%20"))
+}
+
+escapeXml = function (s) {
+    s = s.replace(/&/g, "&amp;")
+    s = s.replace(/</g, "&lt;").
+        replace(/>/g, "&gt;").
+        replace(/'/g, "&apos;").
+        replace(/"/g, "&quot;").
+//            replace(/[\u0000-\u001F]|[\u0080-\uFFFF]/g, function (c) {
+        replace(/[\u0080-\uFFFF]/g, function (c) {
+            var code = c.charCodeAt(0)
+            return '&#' + code + ';'
+            // if we want hex:
+            var hex = code.toString(16)
+            return '&#x' + hex + ';'
+        })
+    return s;
+}
+unescapeXml = function (s) {
+    return s.replace(/&[^;]+;/g, function (s) {
+        switch(s.substring(1, s.length - 1)) {
+            case "amp":  return "&";
+            case "lt":   return "<";
+            case "gt":   return ">";
+            case "apos": return "'";
+            case "quot": return '"';
+            default:
+                if (s.charAt(1) == "#") {
+                    if (s.charAt(2) == "x") {
+                        return String.fromCharCode(parseInt(s.substring(3, s.length - 1), 16));
+                    } else {
+                        return String.fromCharCode(parseInt(s.substring(2, s.length - 1)));
+                    }
+                } else {
+                    throw "unknown XML escape sequence: " + s
+                }
+        }
+    })
+}
+
+////////////////////////////
+// list processing
+
+foreach = function (a, func) {
+    if (a instanceof Array) {
+        for (var i = 0; i < a.length; i++) {
+            if (func(a[i], i) == false) break
+        }
+    } else {
+        for (var k in a) {
+            if (a.hasOwnProperty(k)) {
+                if (func(a[k], k) == false) break
+            }
+        }
+    }
+    return a
+}
+
+filter = function (a, func) {
+    if (a instanceof Array) {
+        var b = []
+        for (var i = 0; i < a.length; i++) {
+            var v = a[i]
+            if (func(v, i)) {
+                b.push(v)
+            }
+        }
+        return b
+    } else {
+        var b = {}
+        for (var k in a) {
+            if (a.hasOwnProperty(k)) {
+                var v = a[k]
+                if (func(v, k)) {
+                    b[k] = v
+                }
+            }
+        }
+        return b
+    }
+}
+
+map = function (a, func) {
+    if (a instanceof Array) {
+        var b = []
+        for (var i = 0; i < a.length; i++) {
+            b.push(func(a[i], i))
+        }
+        return b
+    } else {
+        var b = {}
+        for (var k in a) {
+            if (a.hasOwnProperty(k)) {
+                b[k] = func(a[k], k)
+            }
+        }
+        return b
+    }
+}
+
+mapToSelf = function (a, func) {
+    if (a instanceof Array) {
+        for (var i = 0; i < a.length; i++) {
+            a[i] = func(a[i], i)
+        }
+        return a
+    } else {
+        for (var k in a) {
+            if (a.hasOwnProperty(k)) {
+                a[k] = func(a[k], k)
+            }
+        }
+        return a
+    }
+}
+
+group = function (a, func) {
+    var b = {}
+    foreach(a, function (e) {
+        var k = func(e)
+        if (k) {
+            if (!b[k]) b[k] = []
+            b[k].push(e)
+        }
+    })
+    return b
+}
+
+max = function (a, func) {
+    var bestScore = null
+    var best = null
+    foreach(a, function (e, k) {
+        var score = e
+        if (func)
+            score = func(e, k)
+        if (score > 0 || score <= 0) {
+            if (bestScore == null || score > bestScore) {
+                bestScore = score
+                best = e
+            }
+        }
+    })
+    return best
+}
+
+find = function (a, func) {
+    var ret = null
+    foreach(a, function (e, k) {
+        if (func(e, k)) {
+            ret = e
+            return false
+        }
+    })
+    return ret
+}
+
+//////////////////////////////////////////////
+// json that handles circular references
+
+myJson = function (o) {
     var touched = []
     var result = []
     var appendAtEnd = []
@@ -1356,308 +535,14 @@ function my_json(o) {
     
     return result.join("")
 }
-json = my_json
-try {
-    if (Packages.MyUtil.Json.json('\t') == '"\\t"') {
-        json = function (o) {
-            return "" + Packages.MyUtil.Json.json(o)
-        }
-    }
-} catch (e) {
-}
 
-// adapted: http://snippets.dzone.com/posts/show/4349
-function getXPath(node) {
-    return "/" + getXPathHelper(node, []).join("/")
-}
-function getXPathHelper(node, path) {
-        path = path || [];
-        if(node.parentNode) {
-          path = getXPathHelper(node.parentNode, path);
-        }
-
-        if(node.previousSibling) {
-          var count = 1;
-          var sibling = node.previousSibling
-          do {
-            if(sibling.nodeType == 1 && sibling.nodeName == node.nodeName) {count++;}
-            sibling = sibling.previousSibling;
-          } while(sibling);
-          if(count == 1) {count = null;}
-        } else if(node.nextSibling) {
-          var sibling = node.nextSibling;
-          do {
-            if(sibling.nodeType == 1 && sibling.nodeName == node.nodeName) {
-              var count = 1;
-              sibling = null;
-            } else {
-              var count = null;
-              sibling = sibling.previousSibling;
-            }
-          } while(sibling);
-        }
-
-        if(node.nodeType == 1) {
-          path.push(node.nodeName.toLowerCase() + (count > 0 ? "["+count+"]" : ''));
-        }
-        return path;
-      };
-
-
-function escapeURL(s) {
-    return encodeURIComponent(s)
-}
-escapeUrl = escapeURL
-encodeUrl = escapeURL
-
-function unescapeURL(s) {
-    return decodeURIComponent(s.replace(/\+/g, "%20"))
-}
-unescapeUrl = unescapeURL
-decodeUrl = unescapeURL
-
-// from MonetDB JavaScript XRPC API
-function serializeXML(xml) {
-    try {
-        var xmlSerializer = new window.XMLSerializer();
-        return xmlSerializer.serializeToString(xml);
-    } catch(e){
-        try {
-            return xml.xml;
-        } catch(e){
-            alert("Failed to create xmlSerializer or to serialize XML document:\n" + e);
-        }
-    }
-}
-    //xmlToString = serializeXML
-    //~ XMLToString = serializeXML
-
-// creates functions:
-//      escapeXml
-//      unescapeXml
-(function () {
-    escapeBraces = function (s) {
-        return s.replace(/{/g, '{{').replace(/}/g, '}}')
-    }
-    escapeXml = function (s, _escapeBraces) {
-        s = s.replace(/&/g, "&amp;")
-        s = s.replace(/</g, "&lt;").
-            replace(/>/g, "&gt;").
-            replace(/'/g, "&apos;").
-            replace(/"/g, "&quot;").
-//            replace(/[\u0000-\u001F]|[\u0080-\uFFFF]/g, function (c) {
-            replace(/[\u0080-\uFFFF]/g, function (c) {
-                var code = c.charCodeAt(0)
-                return '&#' + code + ';'
-                // if we want hex:
-                var hex = code.toString(16)
-                return '&#x' + hex + ';'
-            })
-        if (_escapeBraces) {
-            s = escapeBraces(s)
-        }
-        return s;
-    }
-    unescapeXml = function (s) {
-        return s.replace(/&[^;]+;/g, function (s) {
-            switch(s.substring(1, s.length - 1)) {
-                case "amp":  return "&";
-                case "lt":   return "<";
-                case "gt":   return ">";
-                case "apos": return "'";
-                case "quot": return '"';
-                default:
-                    if (s.charAt(1) == "#") {
-                        if (s.charAt(2) == "x") {
-                            return String.fromCharCode(parseInt(s.substring(3, s.length - 1), 16));
-                        } else {
-                            return String.fromCharCode(parseInt(s.substring(2, s.length - 1)));
-                        }
-                    } else {
-                        throw "unknown XML escape sequence: " + s
-                    }
-            }
-        })
-    }
-    escapeXML = escapeXml
-    escapeXPath = escapeXml
-    escapeXQuery = escapeXml
-    unescapeXML = unescapeXml
-})()
-
-function xpath(s, n) {
-    if (!n) n = document
-    if (n.nodeType == 9) {
-        var doc = n
-    } else {
-        var doc = n.ownerDocument
-    }
-    var x = doc.evaluate(s, n, null, 0, null)
-    var a = []
-    while (true) {
-    var b = x.iterateNext()
-    if (!b) break
-    a.push(b)
-    }
-    return a
-}
-
-function getXMLHttpRequest() {
-    if (window.XMLHttpRequest) { 
-        return new XMLHttpRequest()
-    } else if (window.ActiveXObject) {
-        return new ActiveXObject("Microsoft.XMLHTTP")
-    }
-    return null
-}
-
-function my_ajax(url, postParams, callback) {
-    var async = (callback != null)
-    var x = getXMLHttpRequest()
-    
-    function getReturnValue() {
-        return x.responseText
-        //return x.responseXML ? x.responseXML : x.responseText
-    }
-    x.onreadystatechange = function() {
-        if (x.readyState == 4 && x.status == 200) {
-            if (async)
-                callback(getReturnValue())
-        }
-    }
-    if (postParams) {
-        var paramString = ""
-        if ((typeof postParams) == "string") {
-            paramString = postParams
-        } else {
-            paramString = []
-            for (var k in postParams) {
-                paramString.push(escapeURL(k) + "=" + escapeURL(postParams[k]))
-            }
-            paramString = paramString.join("&")        
-        }
-        
-        x.open("POST", url, async)
-        x.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        x.setRequestHeader("Content-length", paramString.length);
-        x.setRequestHeader("Connection", "close");
-        x.send(paramString)
-    } else {
-        x.open("GET", url, async)
-        x.send("")
-    }
-    if (!async) {
-        return getReturnValue()
-    }
-}
-
-function getURLParams(url) {
-    if (url === undefined) {
-        url = window.location.href
-    }
-    var params = {}
-    foreach(url.match(/[\\?&]([^=]+)=([^&#]*)/g), function (m) {
-        var a = m.match(/.([^=]+)=(.*)/)
-        params[decodeUrl(a[1])] = decodeUrl(a[2])
-    })
-    return params
-}
-getUrlParams = getURLParams
-
-// from: http://www.netlobo.com/url_query_string_javascript.html
-function getURLParam(name) {
-  var regexS = "[\\?&]"+name+"=([^&#]*)";
-  var regex = new RegExp( regexS );
-  var results = regex.exec( window.location.href );
-  if( results == null )
-    return "";
-  else
-    return results[1];
-}
-
-parseXml_DOMParser = null
-function parseXml(s) {
-    if (!parseXml_DOMParser) {
-        parseXml_DOMParser = new DOMParser()
-    }
-    return parseXml_DOMParser.parseFromString(s, "text/xml")
-}
-parseXML = parseXml
-
-// these position function I got from somewhere, can't remember (found when looking for drag-n-drop stuff
-function getPosition(e){
-	var left = 0;
-	var top  = 0;
-
-	while (e.offsetParent){
-		left += e.offsetLeft;
-		top  += e.offsetTop;
-		e     = e.offsetParent;
-	}
-
-	left += e.offsetLeft;
-	top  += e.offsetTop;
-
-	return {x:left, y:top};
-}
-function getPositionWithRespectTo(e, p){
-    var ePos = getPosition(e)
-    var pPos = getPosition(p)
-    return {x: (ePos.x - pPos.x), y: (ePos.y - pPos.y)}
-}
-
-function distSq(a, b) {
-    var dx = a.x - b.x
-    var dy = a.y - b.y
-    return (dx * dx) + (dy * dy)
-}
-
-function dist(a, b) {
-    return Math.sqrt(distSq(a, b))
-}
-
-function lerp(t0, v0, t1, v1, t) {
-    return (t - t0) * (v1 - v0) / (t1 - t0) + v0
-}
-
-function indexOf(array, element) {
-    for (var i = 0; i < array.length; i++) {
-        if (array[i] == element) return i;
-    }
-    return -1
-}
-
-function trim(s) {
-    return s.replace(/^\s+|\s+$/g,"");
-}
-String.prototype.trim = function() {
-    return trim(this)
-}
-
-function scrollToHorzCenterIn(thing, scrollParent) {
-    var offsetParent = scrollParent.firstChild
-    var pos = getPositionWithRespectTo(thing, offsetParent)
-    var x = pos.x
-    var w = thing.offsetWidth
-    var mw = offsetParent.offsetWidth
-    var v = scrollParent.offsetWidth
-    
-    scrollParent.scrollLeft = (x + (w / 2)) - (v / 2)
-}
-
-// from: http://lists.evolt.org/pipermail/javascript/2004-June/007409.html
-function addCommas(someNum){
-    while (someNum.match(/^\d\d{3}/)){
-        someNum = someNum.replace(/(\d)(\d{3}(\.|,|$))/, '$1,$2');
-    }
-    return someNum;
-}
-         
 /**
 *
 *  Javascript sprintf
 *  http://www.webtoolkit.info/
 *
+*  licensed under creative commons attribute:
+*  http://creativecommons.org/licenses/by/2.0/uk/
 *
 **/
 sprintfWrapper = {
@@ -1788,7 +673,7 @@ sprintf = sprintfWrapper.init;
  * Copyright (c) 2007 Stefan Goessner (goessner.net)
  * Licensed under the MIT (MIT-LICENSE.txt) licence.
  */
-function jsonPath(obj, expr, arg) {
+jsonPath = function (obj, expr, arg) {
    var P = {
       resultType: arg && arg.resultType || "VALUE",
       result: [],
@@ -1869,198 +754,599 @@ function jsonPath(obj, expr, arg) {
       P.trace(P.normalize(expr).replace(/^\$;/,""), obj, "$");
       return P.result.length ? P.result : false;
    }
-} 
-
-/**
-	<p>Takes two strings <code>a</code> and <code>b</code>, and calculates their differences.
-	The differences are highlighted in each result using HTML span tags with yellow backgrounds.
-	There are two resulting strings of HTML, returned in an object with two properties, <code>a</code> and <code>b</code>.</p>
-    
-    <p>Uses some "diffing" code from the internet, but I'm not sure where I got it.</p>
- */
-function highlightDiff(a, b) {
-    a = a.match(/\w+|\S+|\s+/g)
-    if (!a) a = []
-    b = b.match(/\w+|\S+|\s+/g)
-    if (!b) b = []
-    mapToSelf(a, function (e) { return ":" + e })
-    mapToSelf(b, function (e) { return ":" + e })
-    diff(a, b)
-    function toHTML(tokens) {
-        var yellow = false
-        var s = []
-        foreach(tokens, function (token) {
-            if (typeof token == "string") {
-                if (!yellow) {
-                    yellow = true
-                    s.push('<span style="background-color:yellow">')
-                }
-                s.push(escapeXml(token.substring(1)))
-            } else {
-                if (yellow) {
-                    yellow = false
-                    s.push('</span>')
-                }
-                s.push(escapeXml(token.text.substring(1)))
-            }        
-        })
-        if (yellow) {
-            yellow = false
-            s.push('</span>')
-        }
-        return s.join('')
-    }
-    return {
-        a : toHTML(a),
-        b : toHTML(b)
-    }
-    
-	// much of the "diff" function below comes from the web, but I forget where,
-	// please let me know if you know the source
-    function diff( o, n ) {
-      var ns = new Object();
-      var os = new Object();
-      
-      for ( var i = 0; i < n.length; i++ ) {
-        if ( ns[ n[i] ] == null )
-          ns[ n[i] ] = { rows: new Array(), o: null };
-        ns[ n[i] ].rows.push( i );
-      }
-      
-      for ( var i = 0; i < o.length; i++ ) {
-        if ( os[ o[i] ] == null )
-          os[ o[i] ] = { rows: new Array(), n: null };
-        os[ o[i] ].rows.push( i );
-      }
-      
-      for ( var i in ns ) {
-        if ( ns[i].rows.length == 1 && typeof(os[i]) != "undefined" && os[i].rows.length == 1 ) {
-          n[ ns[i].rows[0] ] = { text: n[ ns[i].rows[0] ], row: os[i].rows[0] };
-          o[ os[i].rows[0] ] = { text: o[ os[i].rows[0] ], row: ns[i].rows[0] };
-        }
-      }
-      
-      for ( var i = 0; i < n.length - 1; i++ ) {
-        if ( n[i].text != null && n[i+1].text == null && n[i].row + 1 < o.length && o[ n[i].row + 1 ].text == null && 
-             n[i+1] == o[ n[i].row + 1 ] ) {
-          n[i+1] = { text: n[i+1], row: n[i].row + 1 };
-          o[n[i].row+1] = { text: o[n[i].row+1], row: i + 1 };
-        }
-      }
-      
-      for ( var i = n.length - 1; i > 0; i-- ) {
-        if ( n[i].text != null && n[i-1].text == null && n[i].row > 0 && o[ n[i].row - 1 ].text == null && 
-             n[i-1] == o[ n[i].row - 1 ] ) {
-          n[i-1] = { text: n[i-1], row: n[i].row - 1 };
-          o[n[i].row-1] = { text: o[n[i].row-1], row: i - 1 };
-        }
-      }
-      
-      return { o: o, n: n };
-    }
 }
 
-/**
-	<p>Here is an example of <code>fold</code>:<br>
-	<code>fold([1, 1, 1, 1], function (x, y) { return x + y }, 0)</code><br>
-	returns <code>4</code>.</p>
-	
-	<p>The value of <code>x</code> in the function will always come from
-	an element of <code>a</code>.</p>
-	
-	<p>If the parameter <code>def</code> is used,
-	then the value of <code>y</code> in the function
-	will always come from <code>def</code>,
-	or from a return value of <code>func</code>.
-	If <code>a</code> has no elements, then <code>def</code> will be returned.</p>
-	
-	<p>If <code>def</code> is not supplied,
-	then both <code>x</code> and <code>y</code> will come from <code>a</code>.
-	If <code>a</code> has only 1 element,
-	then <code>func</code> will not be called,
-	and that one element will be returned.
-	If <code>a</code> has no elements, then <code>null</code> will be returned.</p> 
+/*
+    http://www.JSON.org/json2.js
+    2011-01-18
+
+    Public Domain.
+
+    NO WARRANTY EXPRESSED OR IMPLIED. USE AT YOUR OWN RISK.
+
+    See http://www.JSON.org/js.html
+
+
+    This code should be minified before deployment.
+    See http://javascript.crockford.com/jsmin.html
+
+    USE YOUR OWN COPY. IT IS EXTREMELY UNWISE TO LOAD CODE FROM SERVERS YOU DO
+    NOT CONTROL.
+
+
+    This file creates a global JSON object containing two methods: stringify
+    and parse.
+
+        JSON.stringify(value, replacer, space)
+            value       any JavaScript value, usually an object or array.
+
+            replacer    an optional parameter that determines how object
+                        values are stringified for objects. It can be a
+                        function or an array of strings.
+
+            space       an optional parameter that specifies the indentation
+                        of nested structures. If it is omitted, the text will
+                        be packed without extra whitespace. If it is a number,
+                        it will specify the number of spaces to indent at each
+                        level. If it is a string (such as '\t' or '&nbsp;'),
+                        it contains the characters used to indent at each level.
+
+            This method produces a JSON text from a JavaScript value.
+
+            When an object value is found, if the object contains a toJSON
+            method, its toJSON method will be called and the result will be
+            stringified. A toJSON method does not serialize: it returns the
+            value represented by the name/value pair that should be serialized,
+            or undefined if nothing should be serialized. The toJSON method
+            will be passed the key associated with the value, and this will be
+            bound to the value
+
+            For example, this would serialize Dates as ISO strings.
+
+                Date.prototype.toJSON = function (key) {
+                    function f(n) {
+                        // Format integers to have at least two digits.
+                        return n < 10 ? '0' + n : n;
+                    }
+
+                    return this.getUTCFullYear()   + '-' +
+                         f(this.getUTCMonth() + 1) + '-' +
+                         f(this.getUTCDate())      + 'T' +
+                         f(this.getUTCHours())     + ':' +
+                         f(this.getUTCMinutes())   + ':' +
+                         f(this.getUTCSeconds())   + 'Z';
+                };
+
+            You can provide an optional replacer method. It will be passed the
+            key and value of each member, with this bound to the containing
+            object. The value that is returned from your method will be
+            serialized. If your method returns undefined, then the member will
+            be excluded from the serialization.
+
+            If the replacer parameter is an array of strings, then it will be
+            used to select the members to be serialized. It filters the results
+            such that only members with keys listed in the replacer array are
+            stringified.
+
+            Values that do not have JSON representations, such as undefined or
+            functions, will not be serialized. Such values in objects will be
+            dropped; in arrays they will be replaced with null. You can use
+            a replacer function to replace those with JSON values.
+            JSON.stringify(undefined) returns undefined.
+
+            The optional space parameter produces a stringification of the
+            value that is filled with line breaks and indentation to make it
+            easier to read.
+
+            If the space parameter is a non-empty string, then that string will
+            be used for indentation. If the space parameter is a number, then
+            the indentation will be that many spaces.
+
+            Example:
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}]);
+            // text is '["e",{"pluribus":"unum"}]'
+
+
+            text = JSON.stringify(['e', {pluribus: 'unum'}], null, '\t');
+            // text is '[\n\t"e",\n\t{\n\t\t"pluribus": "unum"\n\t}\n]'
+
+            text = JSON.stringify([new Date()], function (key, value) {
+                return this[key] instanceof Date ?
+                    'Date(' + this[key] + ')' : value;
+            });
+            // text is '["Date(---current time---)"]'
+
+
+        JSON.parse(text, reviver)
+            This method parses a JSON text to produce an object or array.
+            It can throw a SyntaxError exception.
+
+            The optional reviver parameter is a function that can filter and
+            transform the results. It receives each of the keys and values,
+            and its return value is used instead of the original value.
+            If it returns what it received, then the structure is not modified.
+            If it returns undefined then the member is deleted.
+
+            Example:
+
+            // Parse the text. Values that look like ISO date strings will
+            // be converted to Date objects.
+
+            myData = JSON.parse(text, function (key, value) {
+                var a;
+                if (typeof value === 'string') {
+                    a =
+/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/.exec(value);
+                    if (a) {
+                        return new Date(Date.UTC(+a[1], +a[2] - 1, +a[3], +a[4],
+                            +a[5], +a[6]));
+                    }
+                }
+                return value;
+            });
+
+            myData = JSON.parse('["Date(09/09/2001)"]', function (key, value) {
+                var d;
+                if (typeof value === 'string' &&
+                        value.slice(0, 5) === 'Date(' &&
+                        value.slice(-1) === ')') {
+                    d = new Date(value.slice(5, -1));
+                    if (d) {
+                        return d;
+                    }
+                }
+                return value;
+            });
+
+
+    This is a reference implementation. You are free to copy, modify, or
+    redistribute.
 */
-function fold(a, func, def) {
-	if (def === undefined) {
-		var ret = null
-		var first = true
-		foreach(a, function (e) {
-			if (first) {
-				ret = e
-				first = false
-			} else {
-				ret = func(e, ret)
-			}
-		})
-		return ret	
-	} else {
-		var ret = def
-		foreach(a, function (e) {
-			ret = func(e, ret)
-		})	
-		return ret
-	}
+
+/*jslint evil: true, strict: false, regexp: false */
+
+/*members "", "\b", "\t", "\n", "\f", "\r", "\"", JSON, "\\", apply,
+    call, charCodeAt, getUTCDate, getUTCFullYear, getUTCHours,
+    getUTCMinutes, getUTCMonth, getUTCSeconds, hasOwnProperty, join,
+    lastIndex, length, parse, prototype, push, replace, slice, stringify,
+    test, toJSON, toString, valueOf
+*/
+
+
+// Create a JSON object only if one does not already exist. We create the
+// methods in a closure to avoid creating global variables.
+
+var JSON;
+if (!JSON) {
+    JSON = {};
 }
 
+(function () {
+    "use strict";
 
-/**
- * Utility methods for doing statistics. More to come here in the future.
- */
-function Stats() {
+    function f(n) {
+        // Format integers to have at least two digits.
+        return n < 10 ? '0' + n : n;
+    }
+
+    if (typeof Date.prototype.toJSON !== 'function') {
+
+        Date.prototype.toJSON = function (key) {
+
+            return isFinite(this.valueOf()) ?
+                this.getUTCFullYear()     + '-' +
+                f(this.getUTCMonth() + 1) + '-' +
+                f(this.getUTCDate())      + 'T' +
+                f(this.getUTCHours())     + ':' +
+                f(this.getUTCMinutes())   + ':' +
+                f(this.getUTCSeconds())   + 'Z' : null;
+        };
+
+        String.prototype.toJSON      =
+            Number.prototype.toJSON  =
+            Boolean.prototype.toJSON = function (key) {
+                return this.valueOf();
+            };
+    }
+
+    var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+        gap,
+        indent,
+        meta = {    // table of character substitutions
+            '\b': '\\b',
+            '\t': '\\t',
+            '\n': '\\n',
+            '\f': '\\f',
+            '\r': '\\r',
+            '"' : '\\"',
+            '\\': '\\\\'
+        },
+        rep;
+
+
+    function quote(string) {
+
+// If the string contains no control characters, no quote characters, and no
+// backslash characters, then we can safely slap some quotes around it.
+// Otherwise we must also replace the offending characters with safe escape
+// sequences.
+
+        escapable.lastIndex = 0;
+        return escapable.test(string) ? '"' + string.replace(escapable, function (a) {
+            var c = meta[a];
+            return typeof c === 'string' ? c :
+                '\\u' + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        }) + '"' : '"' + string + '"';
+    }
+
+
+    function str(key, holder) {
+
+// Produce a string from holder[key].
+
+        var i,          // The loop counter.
+            k,          // The member key.
+            v,          // The member value.
+            length,
+            mind = gap,
+            partial,
+            value = holder[key];
+
+// If the value has a toJSON method, call it to obtain a replacement value.
+
+        if (value && typeof value === 'object' &&
+                typeof value.toJSON === 'function') {
+            value = value.toJSON(key);
+        }
+
+// If we were called with a replacer function, then call the replacer to
+// obtain a replacement value.
+
+        if (typeof rep === 'function') {
+            value = rep.call(holder, key, value);
+        }
+
+// What happens next depends on the value's type.
+
+        switch (typeof value) {
+        case 'string':
+            return quote(value);
+
+        case 'number':
+
+// JSON numbers must be finite. Encode non-finite numbers as null.
+
+            return isFinite(value) ? String(value) : 'null';
+
+        case 'boolean':
+        case 'null':
+
+// If the value is a boolean or null, convert it to a string. Note:
+// typeof null does not produce 'null'. The case is included here in
+// the remote chance that this gets fixed someday.
+
+            return String(value);
+
+// If the type is 'object', we might be dealing with an object or an array or
+// null.
+
+        case 'object':
+
+// Due to a specification blunder in ECMAScript, typeof null is 'object',
+// so watch out for that case.
+
+            if (!value) {
+                return 'null';
+            }
+
+// Make an array to hold the partial results of stringifying this object value.
+
+            gap += indent;
+            partial = [];
+
+// Is the value an array?
+
+            if (Object.prototype.toString.apply(value) === '[object Array]') {
+
+// The value is an array. Stringify every element. Use null as a placeholder
+// for non-JSON values.
+
+                length = value.length;
+                for (i = 0; i < length; i += 1) {
+                    partial[i] = str(i, value) || 'null';
+                }
+
+// Join all of the elements together, separated with commas, and wrap them in
+// brackets.
+
+                v = partial.length === 0 ? '[]' : gap ?
+                    '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' :
+                    '[' + partial.join(',') + ']';
+                gap = mind;
+                return v;
+            }
+
+// If the replacer is an array, use it to select the members to be stringified.
+
+            if (rep && typeof rep === 'object') {
+                length = rep.length;
+                for (i = 0; i < length; i += 1) {
+                    k = rep[i];
+                    if (typeof k === 'string') {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            } else {
+
+// Otherwise, iterate through all of the keys in the object.
+
+                for (k in value) {
+                    if (Object.hasOwnProperty.call(value, k)) {
+                        v = str(k, value);
+                        if (v) {
+                            partial.push(quote(k) + (gap ? ': ' : ':') + v);
+                        }
+                    }
+                }
+            }
+
+// Join all of the member texts together, separated with commas,
+// and wrap them in braces.
+
+            v = partial.length === 0 ? '{}' : gap ?
+                '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' :
+                '{' + partial.join(',') + '}';
+            gap = mind;
+            return v;
+        }
+    }
+
+// If the JSON object does not yet have a stringify method, give it one.
+
+    if (typeof JSON.stringify !== 'function') {
+        JSON.stringify = function (value, replacer, space) {
+
+// The stringify method takes a value and an optional replacer, and an optional
+// space parameter, and returns a JSON text. The replacer can be a function
+// that can replace values, or an array of strings that will select the keys.
+// A default replacer method can be provided. Use of the space parameter can
+// produce text that is more easily readable.
+
+            var i;
+            gap = '';
+            indent = '';
+
+// If the space parameter is a number, make an indent string containing that
+// many spaces.
+
+            if (typeof space === 'number') {
+                for (i = 0; i < space; i += 1) {
+                    indent += ' ';
+                }
+
+// If the space parameter is a string, it will be used as the indent string.
+
+            } else if (typeof space === 'string') {
+                indent = space;
+            }
+
+// If there is a replacer, it must be a function or an array.
+// Otherwise, throw an error.
+
+            rep = replacer;
+            if (replacer && typeof replacer !== 'function' &&
+                    (typeof replacer !== 'object' ||
+                    typeof replacer.length !== 'number')) {
+                throw new Error('JSON.stringify');
+            }
+
+// Make a fake root object containing our value under the key of ''.
+// Return the result of stringifying the value.
+
+            return str('', {'': value});
+        };
+    }
+
+
+// If the JSON object does not yet have a parse method, give it one.
+
+    if (typeof JSON.parse !== 'function') {
+        JSON.parse = function (text, reviver) {
+
+// The parse method takes a text and an optional reviver function, and returns
+// a JavaScript value if the text is a valid JSON text.
+
+            var j;
+
+            function walk(holder, key) {
+
+// The walk method is used to recursively walk the resulting structure so
+// that modifications can be made.
+
+                var k, v, value = holder[key];
+                if (value && typeof value === 'object') {
+                    for (k in value) {
+                        if (Object.hasOwnProperty.call(value, k)) {
+                            v = walk(value, k);
+                            if (v !== undefined) {
+                                value[k] = v;
+                            } else {
+                                delete value[k];
+                            }
+                        }
+                    }
+                }
+                return reviver.call(holder, key, value);
+            }
+
+
+// Parsing happens in four stages. In the first stage, we replace certain
+// Unicode characters with escape sequences. JavaScript handles many characters
+// incorrectly, either silently deleting them, or treating them as line endings.
+
+            text = String(text);
+            cx.lastIndex = 0;
+            if (cx.test(text)) {
+                text = text.replace(cx, function (a) {
+                    return '\\u' +
+                        ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+                });
+            }
+
+// In the second stage, we run the text against regular expressions that look
+// for non-JSON patterns. We are especially concerned with '()' and 'new'
+// because they can cause invocation, and '=' because it can cause mutation.
+// But just to be safe, we want to reject all unexpected forms.
+
+// We split the second stage into 4 regexp operations in order to work around
+// crippling inefficiencies in IE's and Safari's regexp engines. First we
+// replace the JSON backslash pairs with '@' (a non-JSON character). Second, we
+// replace all simple value tokens with ']' characters. Third, we delete all
+// open brackets that follow a colon or comma or that begin the text. Finally,
+// we look to see that the remaining characters are only whitespace or ']' or
+// ',' or ':' or '{' or '}'. If that is so, then the text is safe for eval.
+
+            if (/^[\],:{}\s]*$/
+                    .test(text.replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+                        .replace(/"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+                        .replace(/(?:^|:|,)(?:\s*\[)+/g, ''))) {
+
+// In the third stage we use the eval function to compile the text into a
+// JavaScript structure. The '{' operator is subject to a syntactic ambiguity
+// in JavaScript: it can begin a block or an object literal. We wrap the text
+// in parens to eliminate the ambiguity.
+
+                j = eval('(' + text + ')');
+
+// In the optional fourth stage, we recursively walk the new structure, passing
+// each name/value pair to a reviver function for possible transformation.
+
+                return typeof reviver === 'function' ?
+                    walk({'': j}, '') : j;
+            }
+
+// If the text is not JSON parseable, then a SyntaxError is thrown.
+
+            throw new SyntaxError('JSON.parse');
+        };
+    }
+}());
+
+decycle = function(o) {
+    var rootKey = "root_" + Math.round(Math.random() * 1000)
+    var uniqueObj = {}
+    while (true) {
+        try {
+            var objs = []
+            function helper(o, path) {
+                if (typeof(o) == "string" && o.slice(0, rootKey.length) == rootKey)
+                    throw "bad root key"
+                if (typeof(o) == "object" && o) {
+                    if (typeof(o[rootKey]) == "object" && o[rootKey].uniqueObj == uniqueObj) {
+                        return o[rootKey].path
+                    } else {
+                        if (rootKey in o)
+                            throw "bad root key"
+                        var oo = (o instanceof Array) ? [] : {}
+                        o[rootKey] = {
+                            uniqueObj : uniqueObj,
+                            path : path,
+                            newObj : oo
+                        }
+                        objs.push(o)
+                        return oo
+                    }
+                }
+                return o
+            }
+            function helper2(o) {
+                var oo = o[rootKey].newObj
+                var path = o[rootKey].path
+                if (o instanceof Array) {
+                    for (var i = 0; i < o.length; i++) {
+                        oo[i] = helper(o[i], path + '[' + i + ']')
+                    }
+                } else {
+                    for (k in o) {
+                        if (k != rootKey) {
+                            oo[k] = helper(o[k], path + '[' + JSON.stringify(k) + ']')
+                        }
+                    }
+                }
+            }
+            function cleanup() {
+                for (var i = 0; i < objs.length; i++) {
+                    delete objs[i][rootKey]
+                }
+            }
+            
+            var ret = {}
+            ret.cycle_root = rootKey
+            ret[rootKey] = helper(o, rootKey)
+            for (var i = 0; i < objs.length; i++) {
+                helper2(objs[i])
+            }
+            cleanup()
+            return ret
+        } catch (e) {
+            cleanup()
+            if (e == "bad root key") {
+                rootKey += Math.round(Math.random() * 1000)
+            } else {
+                throw e
+            }
+        }
+    }
 }
 
-/**
- * Calculate the sum of an array
- */
-Stats.sum = function (a) {
-	return fold(a, function (x, y) { return x + y }, 0)
+recycle = function (obj) {
+    // regex adapted from https://github.com/douglascrockford/JSON-js/blob/master/cycle.js
+    var r = /^root(?:_\d+)?(?:\[(?:\d+|\"(?:[^\\\"\u0000-\u001f]|\\([\\\"\/bfnrt]|u[0-9a-zA-Z]{4}))*\")\])*$/
+    
+    if (!obj.cycle_root || !(obj.cycle_root in obj))
+        throw "doesn't look recycle-able"
+    
+    var rootKey = obj.cycle_root
+    function helper(o) {
+        if (typeof(o) == "string" && o.slice(0, rootKey.length) == rootKey) {
+            if (!o.match(r)) throw "I'm afraid to eval: " + o
+            with (obj) {
+                return eval(o)
+            }
+        }
+        if (typeof(o) == "object" && o) {
+            if (o instanceof Array) {
+                for (var i = 0; i < o.length; i++) {
+                    o[i] = helper(o[i])
+                }
+            } else {
+                for (var k in o) {
+                    o[k] = helper(o[k])
+                }
+            }
+        }
+        return o
+    }
+    return helper(obj[rootKey])
 }
 
-/**
-	Calculate the mean of an array.
-	<code>sum</code> is optional -- it will be calculated if not supplied. 
- */
-Stats.mean = function (a, sum) {
-	if (!(a instanceof Array)) a = values(a)
-	if (sum === undefined) {
-		sum = Stats.sum(a)
-	}
-	return sum / a.length
+if (typeof(json) == "undefined") {
+    json = function (o, indent) {
+        return JSON.stringify(o, null, indent)
+    }
 }
 
-/**
-	Calculate the variance of an array.
-	<code>mean</code> is optional -- it will be calculated if not supplied. 
- */
-Stats.variance = function (a, mean) {
-	if (!(a instanceof Array)) a = values(a)
-	if (!mean) {
-		mean = Stats.mean(a)
-	}
-	return fold(a, function (x, y) {
-		return Math.pow(x - mean, 2) + y
-	}, 0) / (a.length - 1)
-}
-
-/**
-	Calculate the standard deviation of an array.
-	<code>mean</code> is optional -- it will be calculated if not supplied. 
- */
-Stats.sd = function (a, mean) {
-	return Math.sqrt(Stats.variance(a, mean))
-}
-
-/**
-	Calculate the sum, mean, variance and standard deviation of <code>a</code>.
- */
-Stats.all = function (a) {
-	if (!(a instanceof Array)) a = values(a)
-	var ret = {}
-	ret.sum = Stats.sum(a)
-	ret.mean = Stats.mean(a, ret.sum)
-	ret.variance = Stats.variance(a, ret.mean)
-	ret.sd = Math.sqrt(ret.variance)
-	return ret
+unJson = function (s) {
+    var o = JSON.parse(s)
+    try {
+        return recycle(o)
+    } catch (e) {
+        return o
+    }
 }
 
