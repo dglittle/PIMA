@@ -19,12 +19,17 @@ body {
     border-style: ridge;
     border-width: 1px;
     background-color: rgb(230, 230, 230);
+    height: 1.2em;
+    overflow: hidden;
 }
 
 .current-small-card {
     border-style: ridge;
     border-width: 1px;
-    background-color: rgb(230, 230, 0);
+    border-color: rgb(230, 230, 0);
+    background-color: rgb(230, 230, 230);
+    height: 1.2em;
+    overflow: hidden;
 }
 
 .copyable {

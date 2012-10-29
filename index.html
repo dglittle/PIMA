@@ -207,11 +207,20 @@ function getUpcoming() {
 }
 
 function postpone(amount, fuzzy) {
-    model.cards[0].lastPushTime = amount
-    if (fuzzy) {
-        amount *= 1 - Math.pow(Math.random(), 3) 
+    if (amount >= 0) {
+        model.cards[0].lastPushTime = amount
+        if (fuzzy) {
+            amount *= lerp(0, 1, 1, 0.666, Math.pow(Math.random(), 3)) 
+        }
+        model.cards[0].showTime = time() + amount
+    } else {
+        // bumpback
+        amount = model.cards[0].lastPushTime
+        if (!amount || amount < 1000 * 60 * 60 * 24)
+            amount = 1000 * 60 * 60 * 24 * lerp(0, 0.8, 1, 1.2, Math.random())
+        model.cards[0].showTime = time() + amount
+        model.cards[0].lastPushTime = amount * lerp(0, 1.2, 1, 1.4, Math.random())
     }
-    model.cards[0].showTime = time() + amount
     
     var upcoming = getUpcoming()
     if (upcoming[0].length > 0) {
@@ -286,7 +295,7 @@ function viewPasswordCard(dest, card) {
         return r
     })
     
-    var copypad = $('<input type="text" style="width:0px"></input>')
+    var copypad = $('<input type="text" style="width:7px"></input>')
     var copypadMessage = $('<span></span>')
     $('.copyable', $('#current-card-passwords').empty().html(s + "<br>").append(copypad).append(copypadMessage)).each(function (i, span) {
         $(span).click(function () {
@@ -300,6 +309,11 @@ function viewPasswordCard(dest, card) {
             copypadMessage.text('')
         }, 0)
     })    
+}
+
+function formatDate(time) {
+    var d = new Date(time)
+    return "" + (d.getMonth() + 1) + "-" + d.getDate() + "-" + d.getFullYear()
 }
 
 function refresh() {
@@ -318,7 +332,8 @@ function refresh() {
     var showTime = currentCard.showTime - now
     if (showTime < 0)
         showTime = 0
-    $('#showTime').text("showtime: " + englishTimeSpan(showTime))
+    $('#showTime').text("showtime: " + englishTimeSpan(showTime) + ", " + formatDate(currentCard.createTime))
+    $('#bumpback').text("bump back " + Math.floor(currentCard.lastPushTime / (1000 * 60 * 60 * 24)))
     $('#urls').empty()
     foreach(currentCard.text.match(/https?:\/\/\S+/g), function (url) {
         $('#urls').append('<div><a target="_blank" href="' + escapeXml(url) + '">' + escapeXml(url.length > 40 ? (url.substring(0, 40) + '...') : url) + '</a></div>')
@@ -524,7 +539,28 @@ $(function () {
         refresher()
         
         $('#eval').click(function () {
-            eval($('#working-card').val())
+            var d = $('<div style="padding:20px"/>')
+            d.width($('body').width() - 100)
+            d.height($('body').height() - 100)
+            var t = $('<table class="fill"><tr valign="top"><td class="1" width="50%"></td><td class="2"></td><td class="3" width="50%"></td></tr></table>')
+            d.append(t)
+            
+            var left, right, go, close
+            t.find('.1').append(left = $('<textarea class="fill"/>'))
+            t.find('.2').append(go = $('<button/>').text('eval'))
+            t.find('.2').append(close = $('<button/>').text('close'))
+            t.find('.3').append(right = $('<textarea class="fill"/>'))
+            
+            go.click(function () {
+                var ret = eval(left.val())
+                right.val(json(ret, "    "))
+            })
+            close.click(function () {
+                closeDialog()
+            })
+            right.val(json(model, "    "))
+            
+            openDialog(d)
         })
         
         $('#search-query').keydown(function (e) {
@@ -728,7 +764,7 @@ $(function () {
         <td style="width:30%">
             <table class="fill">
                 <tr><td>
-                    <div id="showTime">hi..</div>
+                    <div><small id="showTime">hi..</small></div>
                     <div class="bz">
                         <button onclick="postpone(10 * 60 * 1000)">.</button>
                         <button onclick="postpone(2 * 60 * 60 * 1000, true)">..</button>
@@ -742,6 +778,7 @@ $(function () {
                         <button onclick="postpone(4 * 30 * 24 * 60 * 60 * 1000, true)">4m</button>
                         <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
                         <button onclick="postpone(inf)">&#8734;</button>
+                        <button id="bumpback" onclick="postpone(-1)">bump back</button>
                     </div>
                     <div id="urls"></div>
                     <div id="current-card-passwords"></div>

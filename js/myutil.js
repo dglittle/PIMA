@@ -18,6 +18,75 @@
 ////////////////////////////
 // misc
 
+if (typeof($) != "undefined") {
+    $.fn.myAppend = function (args) {
+        for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i]
+            if (a instanceof Array)
+                $.fn.myAppend.apply(this, a)
+            else
+                this.append(a)
+        }
+        return this
+    }
+    
+    function cssMap(s) {
+        var m = {}
+        foreach(s.split(';'), function (s) {
+            var a = s.split(':')
+            if (a[0])
+                m[trim(a[0])] = trim(a[1])
+        })
+        return m
+    }
+    
+    $.fn.myCss = function (s) {
+        return this.css(cssMap(s))
+    }
+    
+    $.fn.myHover = function (s, that) {
+        var that = that || this
+        var m = cssMap(s)
+        var old = map(m, function (v, k) {
+            return that.css(k)
+        })
+        this.hover(function () {
+            that.css(m)
+        }, function () {
+            that.css(old)
+        })
+        return this
+    }
+}
+
+dialogOpen = false
+openDialog = function (content) {
+    var win = $(window)
+    var w = win.width()
+    var h = win.height()
+    
+    var b
+    $('body').append(b = $('<div style="position:fixed;left:0px;top:0px; z-index:10000;background:black;opacity:0.5"/>').width(w).height(h))
+    
+    var d = $('<div style="position:fixed;z-index:20000;background:white"/>').append(content)
+    $('body').append(d)
+    setTimeout(function () {
+        d.css({
+            left : (w / 2 - d.width() / 2) + "px",
+            top : (h / 2 - d.height() / 2) + "px"
+        })
+    }, 0)
+    
+    dialogOpen = true
+    closeDialog = function () {
+        b.remove()
+        d.remove()
+        dialogOpen = false
+    }
+    cancelDialog = closeDialog
+}
+showDialog = openDialog
+
 pairs = function (a) {
     var p = []
     foreach(a, function (v, k) {
