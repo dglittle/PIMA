@@ -27,7 +27,7 @@ body {
     border-style: ridge;
     border-width: 1px;
     border-color: rgb(230, 230, 0);
-    background-color: rgb(230, 230, 230);
+    background-color: rgb(230, 230, 0);
     height: 1.2em;
     overflow: hidden;
 }
