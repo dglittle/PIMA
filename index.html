@@ -254,6 +254,22 @@ function editCard(dest, card) {
     dest.keyup(save)
 }
 
+function generatePass() {
+  var chars = "abcdefghijklmnopqrstuvwxyz0123456789~!@#$%^&*"
+  var pass = ""
+  var textarea = $("#current-card")
+  for (var i = 0; i < 20; i++) {
+    pass += chars[Math.floor(Math.random() * chars.length)]
+  }
+  var cursor = textarea.prop("selectionStart")
+  var formText = textarea.val()
+  if (cursor) 
+    textarea.val(formText.slice(0, cursor)
+                 + pass
+                 + formText.slice(textarea.prop("selectionEnd")));
+  
+}
+
 function viewPasswordCard(dest, card) {
     var now = time()
     if ((card.showPasswordsUntil && now < card.showPasswordsUntil) || (!card.showPasswordsUntil && now < card.createTime + 1000 * 60 * 10)) {
@@ -779,6 +795,7 @@ $(function () {
                         <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
                         <button onclick="postpone(inf)">&#8734;</button>
                         <button id="bumpback" onclick="postpone(-1)">bump back</button>
+                        <button onclick="generatePass()">new pass</button>
                     </div>
                     <div id="urls"></div>
                     <div id="current-card-passwords"></div>
