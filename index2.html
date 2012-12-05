@@ -38,7 +38,10 @@
             }
         });
         $textarea2.appendTo($dialog2);
-        setTextareaSize($textarea2, $dialog2);        
+        setTextareaSize($textarea2, $dialog2);
+
+        var d = generateSampleData();
+        $textarea1.val(JSON.stringify(d));
     });
 
     function setTextareaSize (textarea, dialog) {
@@ -46,6 +49,17 @@
             width: dialog.dialog('option', 'width') - 7, // add some padding
             height: dialog.height() - 7 // add some padding
         })
+    }
+
+    function generateSampleData () {
+        var data = {};
+        data.cards = [];
+        for(var i = 1; i <= 10; i++) {
+            var obj = {};
+            obj.text = "foobar\n bazquux";
+            data.cards.push(obj);
+        }
+        return data;
     }
     </script>
 </body>
