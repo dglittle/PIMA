@@ -3,17 +3,50 @@
 <head>
     <title>PIMA</title>
     <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.0/themes/base/jquery-ui.css">
+    <style type="text/css">
+    textarea {
+        resize: none;
+    }
+    .ui-dialog #dialog {
+        padding: 0;
+        overflow: hidden;
+    }
+    </style>
 </head>
 <body>
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
     <script type="text/javascript">
     $(function(){
-        var $dialog = $('<div id="dialog"/>').appendTo('body');
-        $dialog.dialog({
-            title: 'Hello World'
+        var $textarea1 = $('<textarea/>');
+        var $dialog1 = $('<div id="dialog"/>').appendTo('body');
+        $dialog1.dialog({
+            title: 'Hello World',
+            resizeStop: function(event, ui) {
+                setTextareaSize($textarea1, $dialog1);
+            }
         });
+        $textarea1.appendTo($dialog1);
+        setTextareaSize($textarea1, $dialog1);
+
+        var $textarea2 = $('<textarea/>');
+        var $dialog2 = $('<div id="dialog"/>').appendTo('body');
+        $dialog2.dialog({
+            title: 'Hello World',
+            resizeStop: function(event, ui) {
+                setTextareaSize($textarea2, $dialog2);
+            }
+        });
+        $textarea2.appendTo($dialog2);
+        setTextareaSize($textarea2, $dialog2);        
     });
+
+    function setTextareaSize (textarea, dialog) {
+        textarea.css({
+            width: dialog.dialog('option', 'width') - 7, // add some padding
+            height: dialog.height() - 7 // add some padding
+        })
+    }
     </script>
 </body>
 </html>
