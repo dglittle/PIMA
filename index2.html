@@ -21,35 +21,24 @@
         var $textarea1 = $('<textarea/>');
         var $dialog1 = $('<div id="dialog"/>').appendTo('body');
         $dialog1.dialog({
-            title: 'Hello World',
-            resizeStop: function(event, ui) {
-                setTextareaSize($textarea1, $dialog1);
-            }
+            title: 'Hello World'
         });
+        $textarea1.width('100%');
+        $textarea1.height('100%');
         $textarea1.appendTo($dialog1);
-        setTextareaSize($textarea1, $dialog1);
 
         var $textarea2 = $('<textarea/>');
         var $dialog2 = $('<div id="dialog"/>').appendTo('body');
         $dialog2.dialog({
-            title: 'Hello World',
-            resizeStop: function(event, ui) {
-                setTextareaSize($textarea2, $dialog2);
-            }
+            title: 'Hello World'
         });
         $textarea2.appendTo($dialog2);
-        setTextareaSize($textarea2, $dialog2);
+        $textarea2.width('100%');
+        $textarea2.height('100%');
 
         var d = generateSampleData();
         $textarea1.val(JSON.stringify(d));
     });
-
-    function setTextareaSize (textarea, dialog) {
-        textarea.css({
-            width: dialog.dialog('option', 'width') - 7, // add some padding
-            height: dialog.height() - 7 // add some padding
-        })
-    }
 
     function generateSampleData () {
         var data = {};
