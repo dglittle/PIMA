@@ -59,6 +59,10 @@
             obj.text = "foobar\n bazquux";
             data.cards.push(obj);
         }
+        data.windows = [
+            { query : "cards.all()", x : 50, y : 50, w : 100, h : 100 },
+            { query : "cards.recent()", x : 200, y : 100, w : 200, h : 150 }
+        ]
         return data;
     }
     </script>
