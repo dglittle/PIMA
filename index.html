@@ -206,13 +206,29 @@ function getUpcoming() {
     return [upcoming1, upcoming2, upcoming3]
 }
 
+function get_next_6am(t) {
+    var t2 = new Date(t)
+    t2.setHours(6)
+    t2.setMinutes(0)
+    t2.setSeconds(0)
+    t2.setMilliseconds(0)
+    if (t < t2) return t2
+    t2.setDate(t2.getDate() + 1)
+    return t2
+}
+
 function postpone(amount, fuzzy) {
     if (amount >= 0) {
         model.cards[0].lastPushTime = amount
-        if (fuzzy) {
-            amount *= lerp(0, 1, 1, 0.666, Math.pow(Math.random(), 3)) 
+        
+        if (amount == 24 * 60 * 60 * 1000) {
+            model.cards[0].showTime = get_next_6am(new Date()).getTime()
+        } else {
+            if (fuzzy) {
+                amount *= lerp(0, 1, 1, 0.9, Math.pow(Math.random(), 2)) 
+            }
+            model.cards[0].showTime = time() + amount
         }
-        model.cards[0].showTime = time() + amount
     } else {
         // bumpback
         amount = model.cards[0].lastPushTime
@@ -356,7 +372,7 @@ function refresh() {
         return false // just do first url for now
     })
     
-    if (currentCard.text.match(/@password|pass:|password:/)) {
+    if (currentCard.text.match(/@password|pass:|password:/) && !currentCard.text.match(/@nopass(word)?/)) {
         viewPasswordCard($("#current-card"), currentCard)
     } else {
         editCard($("#current-card"), currentCard)
@@ -784,9 +800,9 @@ $(function () {
                     <div class="bz">
                         <button onclick="postpone(10 * 60 * 1000)">.</button>
                         <button onclick="postpone(2 * 60 * 60 * 1000, true)">..</button>
-                        <button onclick="postpone(8 * 60 * 60 * 1000, true)">1</button>
-                        <button onclick="postpone((24 + 8) * 60 * 60 * 1000, true)">2</button>
-                        <button onclick="postpone((64 + 8) * 60 * 60 * 1000, true)">4</button>
+                        <button onclick="postpone(24 * 60 * 60 * 1000, true)">1</button>
+                        <button onclick="postpone(2 * 24 * 60 * 60 * 1000, true)">2</button>
+                        <button onclick="postpone(4 * 24 * 60 * 60 * 1000, true)">4</button>
                         <button onclick="postpone(7 * 24 * 60 * 60 * 1000, true)">w</button>
                         <button onclick="postpone(14 * 24 * 60 * 60 * 1000, true)">2w</button>
                         <button onclick="postpone(30 * 24 * 60 * 60 * 1000, true)">m</button>
