@@ -1,0 +1,34 @@
+- fork https://github.com/dglittle/PIMA
+- note: to see it run:
+    - type: python main.py 12345
+    - then go to: localhost:12345/index2.html
+
+- put these instructions in a new file in the "humanscript" directory
+
+- open "index2.html"
+
+- here is a sketch of what I want it to look like (but make it work):
+
+function drawWindow(w) {
+    do stuff to create dialog window with a textbox in it
+    position the dialog at w.x, w.y, and use w.w and w.h for width and height
+    put w.query as text into the textbox
+}
+
+$(function(){
+    var d = generateSampleData();
+    for w in d.windows:
+        drawWindow(w)
+});
+
+function generateSampleData () {
+    same as before
+}
+
+- test it
+    - run it
+    - take screenshot (should have two windows positioned with data in data.windows from generateSampleData function)
+    - put screenshot in "humanscript/output"
+
+- push everything to github
+- make pull request to original repository 
