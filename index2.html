@@ -19,9 +19,19 @@
     <script type="text/javascript">
     $(function(){
         var d = generateSampleData();
-        for (i in d.windows)
+        data = d;
+        for (var i in d.windows)
             drawWindow(d.windows[i]);
     });
+    
+    function drawCardMin(c) {
+        var $div = $('<div class="cardMin">');
+        $div.text(c.text);
+        $div.height('1.2em');
+        $div.css('overflow', 'hidden');
+        $div.css('border', '1px #FFF solid');
+        return $div;
+    }
     
     function drawWindow(w) {
         var $dialog = $('<div id="dialog"/>').appendTo('body');
@@ -33,9 +43,12 @@
             position: [w.x,w.y]
         });
         $textarea.width('100%');
-        $textarea.height('100%');
+        $textarea.height('1.2em');
         $textarea.val(w.query);
         $textarea.appendTo($dialog);
+        for (var i in data.cards) {
+            drawCardMin(data.cards[i]).appendTo($dialog);
+        }
     }
 
     function generateSampleData () {
