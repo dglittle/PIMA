@@ -27,11 +27,11 @@
         var $dialog = $('<div id="dialog"/>').appendTo('body');
         var $textarea = $('<textarea/>');
         $dialog.dialog({
-            title: 'Hello World'
+            title: 'Hello World',
+            height: w.h, 
+            width: w.w,
+            position: [w.x,w.y]
         });
-        $dialog.dialog('option', 'position', [w.x,w.y]);
-        $dialog.width(w.w);
-        $dialog.height(w.h)
         $textarea.width('100%');
         $textarea.height('100%');
         $textarea.val(w.query);
