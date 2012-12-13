@@ -1,0 +1,69 @@
+Task BQBT: PIMA improvements
+
+// part 1
+
+- fork https://github.com/dglittle/PIMA
+
+- put these instructions, and the subject line of this message, in a new file in the "humanscript" directory (create this directory if it doesn't exist)
+
+// part 2
+
+- note: to see it run
+    - type: python main.py 12345
+    - then go to: localhost:12345/index2.html
+
+- open "index2.html"
+
+- in generateSampleData, when creating the 10 random cards, add a "touchTime" to each card, and set it to i
+- also add obj.text = i + ": " + obj.text for each card
+- later in this function
+    - change "cards.all()" to "current()"
+        - change w to 300 and h to 500 for this card
+        - change x to 0 and y to 0
+    - change "cards.recent()" to "recent()"
+        - change w to 200 and h to 400 for this card
+        - change x to 300 and y to 100
+
+- add these functions
+    function current()
+        return the card in data.cards with the largest touchTime
+    function recent(n)
+        return a copy of data.cards sorted with the largest touchTime first,
+        and if n is set, then trim the array to have only the first n elements
+
+- in drawWindow
+    - remove the for-loop at the end
+    - call eval on w.query, and put results in x
+    - if x is an array, and the first element is an object with a "text" key,
+        then assume its an array of cards, and add them with drawCardMin (like the for-loop used to do)
+    - if x is an object with a "text" key,
+        then assume it is a single card,
+        and display it in a textarea that consumes the rest of the dialog's space
+
+- add this function
+    function redrawEverything()
+        remove everything
+        for w in data.windows:
+            drawWindow(w)
+
+- make onload handler look like this:
+    data = generateSampleData();
+    redrawEverything()
+    
+- in drawCardMin
+    - when the user clicks on a card,
+        set that cards "touchTime" to the current time in millis,
+        then call redrawEverything()
+
+- test it
+    - run it
+    - take screenshot
+    - click the third item from the list in the right window
+    - take screenshot
+    - put screenshots in "humanscript/output"
+
+// last part
+
+- commit and push to github
+- make pull request to original repository
+- respond to this thread saying "done"  
