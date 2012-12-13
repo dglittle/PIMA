@@ -21,20 +21,13 @@
         var $textarea1 = $('<textarea/>');
         var $dialog1 = $('<div id="dialog"/>').appendTo('body');
         $dialog1.dialog({
-            title: 'Hello World'
+            title: 'Hello World',
+            width: 300,
+            height: 200
         });
         $textarea1.width('100%');
         $textarea1.height('100%');
         $textarea1.appendTo($dialog1);
-
-        var $textarea2 = $('<textarea/>');
-        var $dialog2 = $('<div id="dialog"/>').appendTo('body');
-        $dialog2.dialog({
-            title: 'Hello World'
-        });
-        $textarea2.appendTo($dialog2);
-        $textarea2.width('100%');
-        $textarea2.height('100%');
 
         var d = generateSampleData();
         $textarea1.val(JSON.stringify(d));
