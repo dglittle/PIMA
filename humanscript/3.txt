@@ -1,0 +1,49 @@
+Task SICI: create card divs in PIMA
+
+// part 0
+
+- if you have time to do this task right now, reply-all to this message saying "got it" (only the first person to say "got it" should do it)
+
+- when you log time, use the subject line of this task as the message
+
+// part 1
+
+- fork https://github.com/dglittle/PIMA
+
+- put these instructions, and the subject line of this message, in a new file in the "humanscript" directory (create this directory if it doesn't exist)
+
+// part 2
+
+- note: to see it run
+    - type: python main.py 12345
+    - then go to: localhost:12345/index2.html
+
+- open "index2.html"
+
+- right after "var d = generateSampleData();" add "data = d" (data should be global)
+
+- add this function
+    function drawCardMin(c)
+        create a jQuery div
+        set the text to c.text
+        style it so it is 1-line tall (regardless of newlines in c.text)
+        style it so it has no scrollbars, even if it is too small to fit the text
+        put a 1 pixel solid black border on it
+        return the jQuery div
+
+- in drawWindow
+    make the textbox only 1 line tall
+    also, for each card c in data.cards,
+        call drawCardMin(c),
+        and append the div to the dialog
+
+- test it
+    - run it
+    - take a screenshot
+    - put screenshot in "humanscript/output"
+
+// last part
+
+- commit and push to github
+- make pull request to original repository
+- respond to this thread saying "done" 

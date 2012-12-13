@@ -18,20 +18,38 @@
     <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
     <script type="text/javascript">
     $(function(){
-        var $textarea1 = $('<textarea/>');
-        var $dialog1 = $('<div id="dialog"/>').appendTo('body');
-        $dialog1.dialog({
-            title: 'Hello World',
-            width: 300,
-            height: 200
-        });
-        $textarea1.width('100%');
-        $textarea1.height('100%');
-        $textarea1.appendTo($dialog1);
-
         var d = generateSampleData();
-        $textarea1.val(JSON.stringify(d));
+        data = d;
+        for (var i in d.windows)
+            drawWindow(d.windows[i]);
     });
+    
+    function drawCardMin(c) {
+        var $div = $('<div class="cardMin">');
+        $div.text(c.text);
+        $div.height('1.2em');
+        $div.css('overflow', 'hidden');
+        $div.css('border', '1px #FFF solid');
+        return $div;
+    }
+    
+    function drawWindow(w) {
+        var $dialog = $('<div id="dialog"/>').appendTo('body');
+        var $textarea = $('<textarea/>');
+        $dialog.dialog({
+            title: 'Hello World',
+            height: w.h, 
+            width: w.w,
+            position: [w.x,w.y]
+        });
+        $textarea.width('100%');
+        $textarea.height('1.2em');
+        $textarea.val(w.query);
+        $textarea.appendTo($dialog);
+        for (var i in data.cards) {
+            drawCardMin(data.cards[i]).appendTo($dialog);
+        }
+    }
 
     function generateSampleData () {
         var data = {};
