@@ -698,6 +698,20 @@ $(function () {
         div.dialog({model : true})
     }
     
+    $('#loadTestData').click(function(){
+        $.get('/test_data.txt', function (data) {
+            model = JSON.parse(data)
+            var timeDelta = new Date().getTime() - model.snapshotTime 
+            for (i in model.cards) {
+                var c = model.cards[i]
+                c.createTime += timeDelta
+                c.showTime += timeDelta
+                c.touchTime += timeDelta
+            }
+            refresh()
+        })
+    });
+    
     ///////////////////////////////////////////////////////////
     // create the model
     $.get('/data.txt', function (data) {
@@ -792,6 +806,7 @@ $(function () {
                 <tr><td>
                     <div id="gmail"></div>
                     <button onclick="setPassword()">set password</button>
+                    <button id="loadTestData">load test data</button>
                 </td></tr>
             </table>
         </td>
