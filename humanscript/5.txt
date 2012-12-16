@@ -1,0 +1,45 @@
+Task PVEH: PIMA load test data
+// part 0
+
+- if you have time to do this task right now, reply-all to this message saying "got it" (only the first person to say "got it" should do it)
+
+- when you log time, use the subject line of this task as the message
+
+// part 1
+
+- fork https://github.com/dglittle/PIMA
+
+- put these instructions, and the subject line of this message, in a new file in the "humanscript" directory (create this directory if it doesn't exist)
+
+// part 2
+
+- note: working on "index.html" rather than "index2.html"
+
+- note: to see it run
+    - type: python main.py 12345
+    - go to: http://localhost:12345
+
+- add a "load test data" button next to the "set password" button in the lower left
+- when this button is clicked,
+    do something like this:
+    $.get('/test_data.txt', function (data) {
+        model = json parse (data)
+        var timeDelta = current time - model.snapshotTime 
+        for each c in model.cards:
+            c.createTime += timeDelta
+            c.showTime += timeDelta
+            c.touchTime += timeDelta
+        refresh()
+    })
+    
+- test it
+    - run it
+    - press the new load test data button
+    - take a screenshot
+    - put screenshot in "humanscript/output"
+
+// last part
+
+- commit and push to github
+- make pull request to original repository
+- respond to this thread saying "done"   
