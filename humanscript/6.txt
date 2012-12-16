@@ -1,0 +1,49 @@
+Task BLNJ: PIMA visualization
+
+// part 0
+
+- if you have time to do this task right now, reply-all to this message saying "got it" (only the first person to say "got it" should do it)
+
+- when you log time, use the subject line of this task as the message
+
+// part 1
+
+- fork https://github.com/dglittle/PIMA
+
+- put these instructions, and the subject line of this message, in a new file in the "humanscript" directory (create this directory if it doesn't exist)
+
+// part 2
+
+- note: working on "index.html" rather than "index2.html"
+
+- note: to see it run
+    - type: python main.py 12345
+    - go to: http://localhost:12345
+
+- when 'load test data' is clicked,
+    - make it 'confirm' with the user that they want this (so they don't accidentally override real data)
+    - after it calls 'refresh()',
+    - let a = an array with 365 elements, each element set to 0
+    - for each c in model.cards,
+        daysFromNow = (c.showTime - now) / (milliseconds in a day)
+        a[daysFromNow]++
+    - create a canvas,
+    - put it in place of the 7 days listed at the bottom of the interface,
+    - it should be as wide as the screen
+    - make it 100 pixels heigh
+    - map the lower left corner of the canvas to 0,0
+    - map the upper right corner of the canvas to 365,100
+    - for index, value in a:
+        draw a blue rectangle from index, 0 to index+1, value 
+    
+- test it
+    - run it
+    - press the 'load test data' button
+    - take a screenshot
+    - put screenshot in "humanscript/output"
+
+// last part
+
+- commit and push to github
+- make pull request to original repository
+- respond to this thread saying "done"   
