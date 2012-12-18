@@ -699,16 +699,36 @@ $(function () {
     }
     
     $('#loadTestData').click(function(){
+        if (!confirm('Warning: Old data will be replaced. Load test data?'))
+            return
         $.get('/test_data.txt', function (data) {
             model = JSON.parse(data)
             var timeDelta = new Date().getTime() - model.snapshotTime 
-            for (i in model.cards) {
+            for (var i in model.cards) {
                 var c = model.cards[i]
                 c.createTime += timeDelta
                 c.showTime += timeDelta
                 c.touchTime += timeDelta
             }
             refresh()
+            var a = []
+            for (var i = 0; i < 365; i++) 
+                a[i] = 0
+            for (var i in model.cards) {
+                c = model.cards[i]
+                var daysFromNow = Math.floor((c.showTime - (new Date).getTime()) / (86400000))
+                a[daysFromNow]++
+            }
+            console.log(a)
+            var canvas = $('<canvas>').height('100px').width('100%')
+            $('#day-1').parent().html((canvas.appendTo('<td>')))
+            var cw = Math.floor(canvas.width() / 365)
+            var ctx = canvas[0].getContext('2d')
+            ctx.fillStyle = "rgb(0,0,200)"
+            for (i in a) {
+                ctx.fillRect(i * cw, 100 - a[i], cw, a[i])
+            }
+            
         })
     });
     
