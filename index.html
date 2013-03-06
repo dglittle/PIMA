@@ -1,28 +1,48 @@
 <html>
 <head>
 <title>PIMA</title>
-<link rel="StyleSheet" href="js/common.css" type="text/css">
-<link rel="Stylesheet" href="js/jquery-ui.css" type="text/css" />
 <style>
 
-.bz button {
-    font-size: xx-small;
+.fill {
+    width: 100%;
+    height: 100%;
+}
+
+table {
+    border-collapse: collapse;
+}
+th, td {
+    padding: 0;
+}
+
+.header {
+    margin-top:15px;
+    margin-bottom:5px;
+    margin-left:5px;
+    font-size:small;
+    font-weight:bold
 }
 
 </style>
 </head>
 <body>
-<script src="js/jquery.min.js"></script>
-<script src="js/jquery-ui.min.js"></script>
-<script src="js/myutil.js"></script>
-<script src="js/tab.js"></script>
-<script src="js/AES.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.2/underscore-min.js"></script>
+<script src="https://raw.github.com/dglittle/myutil/master/myutil2.js"></script>
+<script src="https://raw.github.com/dglittle/myutil/master/tab.js"></script>
+<script src="AES.js"></script>
 <script>
-/* <![CDATA[ */
 
-var inf = 1e100
+_.getStartOfDay = function (time) {
+    var t = new Date(time)
+    t.setHours(0)
+    t.setMinutes(0)
+    t.setSeconds(0)
+    t.setMilliseconds(0)
+    return t.getTime()
+}
 
-function englishTimeSpan(t) {
+_.englishTimeSpan = function(t) {
     var second = 1000
     var minute = second * 60
     var hour = minute * 60
@@ -31,27 +51,73 @@ function englishTimeSpan(t) {
     var month = day * 30
     var year = day * 365
     // years
-    if (t >= inf)
+    if (t >= Number.MAX_VALUE)
         return "never"
     if (t / year >= 1)
-        return sprintf("%0.1f years", t / year)
+        return (t / year).toFixed(1) + " years"
     if (t / month >= 1)
-        return sprintf("%0.1f months", t / month)
+        return (t / month).toFixed(1) + " months"
     if (t / week >= 1)
-        return sprintf("%0.1f weeks", t / week)
+        return (t / week).toFixed(1) + " weeks"
     if (t / day >= 1)
-        return sprintf("%0.1f days", t / day)
+        return (t / day).toFixed(1) + " days"
     if (t / hour >= 1)
-        return sprintf("%0.1f hours", t / hour)
+        return (t / hour).toFixed(1) + " hours"
     if (t / minute >= 1)
-        return sprintf("%0.1f minutes", t / minute)
+        return (t / minute).toFixed(1) + " minutes"
     if (t / second >= 1)
-        return sprintf("%0.0f seconds", t / second)
+        return (t / second).toFixed(1) + " seconds"
     return "now"
 }
 
-function getTitle(text) {
-    return text.match(/(@info\r?\n)?[ \t\r\n]*(.*)/)[2]
+function openCard(card) {
+    card.touchTime = _.time()
+    g_current_card = card
+    save()
+    refresh()
+}
+
+function newCard() {
+    var now = _.time()
+    return {
+        text : "",
+        createTime : now,
+        showTime : now,
+        touchTime : now,
+        lastPushTime : 0
+    }
+}
+
+function getTitle(card) {
+    return card.text.match(/\s*(.*)/)[1]
+}
+
+function addNewCard() {
+    var card = newCard()
+    g_db.cards.push(card)
+    openCard(card)
+    $('.mainCardEditor textarea').focus()
+}
+
+function drawSmallCard(card) {
+    var div = $('<div style="width:180px"/>')
+    div.text(getTitle(card))
+    div.height('1.2em')
+    div.css('overflow', 'hidden')
+    div.css('background', card == g_current_card ? 'gold' : 'lightgrey')
+    div.click(function() {
+        openCard(card)
+    })
+    return div
+}
+
+function drawSmallCards(cards) {
+    var div = $('<div class="fill"/>')
+    div.css('overflow', 'auto')
+    _.each(cards, function (e) {
+        div.append(drawSmallCard(e).css('margin-bottom', '1px'))
+    })
+    return div
 }
 
 function searchCards(cards, q) {
@@ -60,85 +126,33 @@ function searchCards(cards, q) {
         searchAll = true
         q = q.slice(1)
     }
-    var REs = map(q.split(/\s+/), function (q) { return new RegExp(q, "i") })
+
+    var REs = _.map(q.split(/\s+|\b/), function (q) { return new RegExp(_.escapeRegExp(q), "i") })
     
     function scoreCard(card) {
-        if (!searchAll && card.showTime >= inf) {
+        if (!searchAll && card.showTime >= Number.MAX_VALUE) {
             return -1
         }
-        var allMatch = true
-        var titleMatches = 0
-        var title = getTitle(card.text)
-        foreach(REs, function (re) {
-            if (!card.text.match(re)) {
-                allMatch = false
-                return false
-            }
-            if (title.match(re)) {
-                titleMatches++
-            }
+        var score = -1
+        var title = getTitle(card)
+        _.each(REs, function (re) {
+            if (title.match(re))
+                score += 3
+            else if (card.text.match(re))
+                score += 1
         })
-        if (!allMatch)
-            return -1
-        
-        return titleMatches + (1.0 / title.length)
+        return score + (1.0 / (title.length + 2))
     }
-    
-    var x = []
-    foreach(cards, function (c) {
-        var score = scoreCard(c)
-        if (score >= 0) {
-            x.push({
-                card : c,
-                score : score
-            })
-        }
+
+    return _.map(_.sortBy(_.filter(_.map(cards, function (e) {
+        return { card : e, score : scoreCard(e) }
+    }), function (e) {
+        return e.score >= 0
+    }), function (e) {
+        return -e.score
+    }), function (e) {
+        return e.card
     })
-    x.sort(function (a, b) { return b.score - a.score })
-    x = map(x, function (x) { return x.card })
-    return x
-}
-
-function createSmallCardDiv(card) {
-    var text = card.text
-    var orig = text
-    
-    text = getTitle(text)
-    if (text.length > 30) {
-        text = text.substring(0, 27) + "..."
-    }
-    text = text.replace(/\s+/g, " ")    
-    
-    if (card != model.cards[0]) {
-        var div = $('<div class="small-card"></div>')
-    } else {
-        var div = $('<div class="current-small-card" title="' + escapeXml(orig) + '"></div>')
-    }
-    if (text.match(/\S/))
-        div.text(text)
-    else
-        div.text('...')
-    div.click(function () {
-        openCard(card)
-    })
-    return div    
-}
-
-function newCard() {
-    var now = time()
-    return {
-        text : "",
-        createTime : now,
-        showTime : now,
-        lastPushTime : 0,
-        touchTime : now
-    }
-}
-
-function addNewCard() {
-    model.cards.push(newCard())
-    refresh()
-    $('#current-card').focus()
 }
 
 function goToCard() {
@@ -149,163 +163,100 @@ function goToCard() {
             s = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd)
         } else {
             for (var start = textarea.selectionStart; start >= 0; start--) {
-                if (!textarea.value[start].match(/\w| /)) {
+                if (!textarea.value[start].match(/./)) {
                     start++
                     break
                 }
             }
             for (var end = textarea.selectionStart; end < textarea.value.length; end++) {
-                if (!textarea.value[end].match(/\w| /)) {
-                    end--
+                if (!textarea.value[end].match(/./)) {
                     break
                 }
             }
             s = textarea.value.substring(start, end)
         }
-        
         if (s) {
-            var cs = searchCards(model.cards, s)
-            if (cs.length > 0) {
-                openCard(cs[0])
-            }
+            openCard(searchCards(g_db.cards, s)[0])
         }
     }
 }
 
-function openCard(card) {
-    card.touchTime = time()
-    refresh()
-}
+function drawSmallCardsWithDates(num) {
+    var div = $('<div class="fill"/>')
+    div.css('overflow', 'auto')
 
-function getUpcoming() {
-    var now = time()
-    
-    var upcoming1 = []
-    var upcoming2 = []
-    var upcoming3 = []
-    var cards = model.cards.slice(0).sort(function (a, b) {
-        var d = a.showTime - b.showTime
-        if (d != 0) return d
-        d = b.createTime - a.createTime
-        if (d != 0) return d
-        return compare(a.text, b.text)
-    })
-    foreach(cards, function (card) {
-        if (card.showTime <= now)
-            upcoming1.push(card)
-        else if (card.showTime <= now + (15 * 60 * 1000))
-            upcoming2.push(card)
-        else if (upcoming3.length < 10)
-            upcoming3.push(card)
+    var cards = _.sortBy(g_db.cards, function (e) { return e.showTime }).slice(0, num)
+
+    var startOfToday = _.getStartOfDay(_.time())
+
+    function getDisplayDate(time) {
+        return ("" + new Date(time)).replace(/0+([1-9])/g, '$1').match(/\S+ \S+ \S+/)[0]
+    }
+    function drawHeader(time) {
+        var text = null
+        if (time < startOfToday)
+            text = "backlog"
+        else if (time >= startOfToday && time < startOfToday + 24 * 60 * 60 * 1000)
+            text = getDisplayDate(time) + " (today)"
         else
-            return false
-    })
-    upcoming1.sort(function (a, b) {
-        return a.lastPushTime - b.lastPushTime
-    })
-    return [upcoming1, upcoming2, upcoming3]
-}
+            text = getDisplayDate(time)
+        return $('<div class="header">').text(text)
+    }
 
-function get_next_6am(t) {
-    var t2 = new Date(t)
-    t2.setHours(6)
-    t2.setMinutes(0)
-    t2.setSeconds(0)
-    t2.setMilliseconds(0)
-    if (t < t2) return t2
-    t2.setDate(t2.getDate() + 1)
-    return t2
-}
+    var nextHeaderTime = startOfToday
 
-function postpone(amount, fuzzy) {
-    if (amount >= 0) {
-        model.cards[0].lastPushTime = amount
-        
-        if (amount == 24 * 60 * 60 * 1000) {
-            model.cards[0].showTime = get_next_6am(new Date()).getTime()
-        } else {
-            if (fuzzy) {
-                amount *= lerp(0, 1, 1, 0.9, Math.pow(Math.random(), 2)) 
-            }
-            model.cards[0].showTime = time() + amount
+    _.each(cards, function (c, i) {
+        if (i == 0 && c.showTime < startOfToday) {
+            div.append(drawHeader(c.showTime))
         }
-    } else {
-        // bumpback
-        amount = model.cards[0].lastPushTime
-        if (!amount || amount < 1000 * 60 * 60 * 24)
-            amount = 1000 * 60 * 60 * 24 * lerp(0, 0.8, 1, 1.2, Math.random())
-        model.cards[0].showTime = time() + amount
-        model.cards[0].lastPushTime = amount * lerp(0, 1.2, 1, 1.4, Math.random())
-    }
-    
-    var upcoming = getUpcoming()
-    if (upcoming[0].length > 0) {
-        // openCard(upcoming[0][0])
-        openCard(upcoming[0][upcoming[0].length - 1])
-    } else if (upcoming[1].length > 0) {
-        openCard(upcoming[1][0])
-    } else if (upcoming[2].length > 0) {
-        openCard(upcoming[2][0])
-    } else {
-        refresh()
-    }
-}
-
-function addCards(dest, cards) {
-    dest.empty()
-    foreach(cards, function (card) {
-        dest.append(createSmallCardDiv(card))
+        while (nextHeaderTime <= c.showTime) {
+            div.append(drawHeader(nextHeaderTime))
+            nextHeaderTime += 24 * 60 * 60 * 1000
+        }
+        div.append(drawSmallCard(c).css('margin-bottom', '1px'))
     })
+    return div
 }
 
-function editCard(dest, card) {
-    $('#current-card-passwords').empty()
-    dest.unbind()
-    dest.val(card.text)
-    function save() {
-        card.text = dest.val()
-        onChange()
-    }
-    dest.keydown(save)
-    dest.keyup(save)
-    dest.change(save)
+function drawCardEditor(card) {
+    var div = $('<div class="fill"/>')
+    var t = $('<textarea class="fill"/>')
+
+    // this setTimeout works around a bug in WebKit,
+    // and may not be necessary after that bug is fixed.
+    // see: http://realgl.blogspot.com/2013/01/webkit-bug.html
+    setTimeout(function () {
+        t.val(card.text)
+        function f() {
+            card.text = t.val()
+            save()
+        }
+        t.keyup(f)
+        t.change(f)
+    }, 1)
+
+    div.append(t)
+    return div
 }
 
-function generatePass() {
-  var chars = "abcdefghijklmnopqrstuvwxyz0123456789~!@#$%^&*"
-  var pass = ""
-  var textarea = $("#current-card")
-  for (var i = 0; i < 20; i++) {
-    pass += chars[Math.floor(Math.random() * chars.length)]
-  }
-  var cursor = textarea.prop("selectionStart")
-  var formText = textarea.val()
-  if (cursor) { 
-    textarea.val(formText.slice(0, cursor)
-                 + pass
-                 + formText.slice(textarea.prop("selectionEnd")));
-    textarea.change()
-  }
-}
-
-function viewPasswordCard(dest, card) {
-    var now = time()
+function drawCardPasswordEditor(card) {
+    var now = _.time()
     if ((card.showPasswordsUntil && now < card.showPasswordsUntil) || (!card.showPasswordsUntil && now < card.createTime + 1000 * 60 * 10)) {
-        editCard(dest, card)
-        $('#current-card-passwords').append($('<button>hide passwords</button>').click(function () {
-            card.showPasswordsUntil = now
+        return splitVert(1, $('<button>hide passwords</button>').click(function () {
+            card.showPasswordsUntil = _.time()
             refresh()
-        }))
-        return
+        }), drawCardEditor(card))
     }
-    
-    dest.unbind()
-    dest.val("click here to edit")
-    dest.click(function () {
-        card.showPasswordsUntil = time() + 1000 * 60 * 10
+
+    var top = $('<div/>')
+    top.append($('<button>show passwords</button>').click(function () {
+        card.showPasswordsUntil = _.time() + 1000 * 60 * 10
         refresh()
-    })
-    
+    }))
+    var copypad = $('<input type="text" style="width:7px"></input>')
+    var copypadMessage = $('<span></span>')
+    top.append(copypad).append(copypadMessage)
+
     var s = card.text
     
     var token = "XXX"
@@ -319,19 +270,18 @@ function viewPasswordCard(dest, card) {
         a.push(value)
         return colon + token
     })
-    s = escapeXml(s)
+    s = _.escape(s)
     s = s.replace(/\r?\n/g, '<br>')
-	
+    
     var i = 0
     s = s.replace(new RegExp(token, 'g'), function () {
-        var r = '<span class="copyable">XXX</span>'
+        var r = '<span class="copyable" style="background:lightgrey">XXX</span>'
         i++
         return r
     })
-    
-    var copypad = $('<input type="text" style="width:7px"></input>')
-    var copypadMessage = $('<span></span>')
-    $('.copyable', $('#current-card-passwords').empty().html(s + "<br>").append(copypad).append(copypadMessage)).each(function (i, span) {
+
+    var bottom = $('<div class="fill"/>').html(s + "<br>")
+    $('.copyable', bottom).each(function (i, span) {
         $(span).click(function () {
             copypad.val(a[i]).select().focus()
             copypadMessage.html('<b>&larr; ctrl-c</b>')
@@ -342,96 +292,96 @@ function viewPasswordCard(dest, card) {
             copypad.val('nothing').select().focus()
             copypadMessage.text('')
         }, 0)
-    })    
+    })
+
+    return splitVert(1, top, bottom)
 }
 
-function formatDate(time) {
-    var d = new Date(time)
-    return "" + (d.getMonth() + 1) + "-" + d.getDate() + "-" + d.getFullYear()
-}
-
-function refresh() {
-    onChange()
-    
-    var now = time()
-    
-    editCard($("#working-card"), model.workingCard)
-    
-    model.cards.sort(function (a, b) {
-        return b.touchTime - a.touchTime
-    })
-    
-    var currentCard = model.cards[0]
-    
-    var showTime = currentCard.showTime - now
-    if (showTime < 0)
-        showTime = 0
-    $('#showTime').text("showtime: " + englishTimeSpan(showTime) + ", " + formatDate(currentCard.createTime))
-    $('#bumpback').text("bump back " + Math.floor(currentCard.lastPushTime / (1000 * 60 * 60 * 24)))
-    $('#urls').empty()
-    foreach(currentCard.text.match(/https?:\/\/\S+/g), function (url) {
-        $('#urls').append('<div><a target="_blank" href="' + escapeXml(url) + '">' + escapeXml(url.length > 40 ? (url.substring(0, 40) + '...') : url) + '</a></div>')
-        return false // just do first url for now
-    })
-    
-    if (currentCard.text.match(/@password|pass:|password:/) && !currentCard.text.match(/@nopass(word)?/)) {
-        viewPasswordCard($("#current-card"), currentCard)
-    } else {
-        editCard($("#current-card"), currentCard)
-    }
-
-    addCards($('body', $('#recent-cards').contents()), model.cards.slice(0, 8))
-    
-    var upcoming = getUpcoming()
-    
-    addCards($('body', $('#upcoming1-cards').contents()), upcoming[0])
-    addCards($('body', $('#upcoming2-cards').contents()), upcoming[1])
-    addCards($('body', $('#upcoming3-cards').contents()), upcoming[2])
-    
-    var q = $('#search-query').val()
-    addCards($('body', $('#search-cards').contents()), q ? searchCards(model.cards, q) : [])
-    
-    // calendar stuff
-    var calCards = []
-    foreach(model.cards, function (card) {
-        if (card.showTime >= inf)
-            return
-        var m = card.text.match(/@cal(.*)/)
-        if (m) {
-            calCards.push({
-                cal : trim(m[1]),
-                card : card
-            })
+g_searchQuery = ""
+function drawCardSearchAndRecent() {
+    var div = $('<div class="fill"/>')
+    div.css('overflow', 'auto')
+    div.append($('<div class="header">recent</div>'))
+    div.append(drawSmallCards(_.sortBy(g_db.cards, function (e) { return -e.touchTime }).slice(0, 4)).removeClass('fill').css('width', '100%'))
+    div.append($('<div class="header">search</div>'))
+    div.append($('<input class="searchBox" type="text" style="width:100%"/>').val(g_searchQuery).keydown(function (e) {
+        if (e.keyCode == 13) {
+            g_searchQuery = $(e.currentTarget).val()
+            openCard(searchCards(g_db.cards, g_searchQuery)[0])
         }
-    })
-    for (var i = 0; i < 7; i++) {
-        var day = now + (i * 1000 * 60 * 60 * 24)
-        day = ("" + new Date(day)).replace(/0+([1-9])/g, '$1').match(/\S+ \S+ \S+/)[0]
-        var div = $('<div style="width:100%"></div>')
-        $('#day-' + (i + 1)).empty().append($('<span></span>').text(day)).append(div)
-        
-        var dayCards = []
-        foreach(calCards, function (calCard) {
-            if (!find(calCard.cal.match(/\S+/g), function (s) { return !day.match(new RegExp(s, "i")) })) {
-                dayCards.push(calCard.card)
-            }
+    }))
+    div.append(drawSmallCards(g_searchQuery ? searchCards(g_db.cards, g_searchQuery) : []).removeClass('fill').css('width', '100%'))
+    return div
+}
+
+function pushback(card, amount, fuzzy) {
+    if (amount < 0) amount = card.lastPushTime
+    if (fuzzy) amount *= _.lerp(0, 1, 1, 0.5, Math.pow(Math.random(), 2))
+    card.lastPushTime = amount
+    var openNext = true
+    if (amount > 0) {
+        card.showTime = _.time() + card.lastPushTime
+    } else {
+        var today = _.getStartOfDay(_.time())
+        var tomorrow = today + 24 * 60 * 60 * 1000
+        if (card.showTime > tomorrow) openNext = false
+        card.showTime = today
+        _.each(g_db.cards, function (c) {
+            if (c.showTime < tomorrow && c.showTime > card.showTime)
+                card.showTime = c.showTime + 1
         })
-        
-        addCards(div, dayCards)
+    }
+    if (openNext) {
+        openCard(_.min(g_db.cards, function (e) { return e.showTime }))
+    } else {
+        save()
+        refresh()
     }
 }
 
-function grabFromGMail(button, username, password) {
-    button.attr('disabled', 'disabled')
-    $.post('/api/gmail', username + "," + password, function (data) {
+function drawCardInfo(card) {
+    var div = $('<div/>')
+    div.text("showtime: " + _.englishTimeSpan(card.showTime - _.time()))
+    return div
+}
+
+function drawPushbackButtons() {
+    var div = $('<div/>')
+    function createButton(label, time, fuzzy) {
+        var b
+        div.append(b = $('<button/>').text(label).click(function () {
+            if (g_current_card)
+                pushback(g_current_card, time, fuzzy)
+        }))
+        return b
+    }
+    createButton('.', 0)
+    createButton('1', 24 * 60 * 60 * 1000)
+    createButton('2', 2 * 24 * 60 * 60 * 1000)
+    createButton('4', 4 * 24 * 60 * 60 * 1000, true)
+    createButton('w', 7 * 24 * 60 * 60 * 1000, true)
+    createButton('2w', 14 * 24 * 60 * 60 * 1000, true)
+    createButton('m', 30 * 24 * 60 * 60 * 1000, true)
+    createButton('2m', 60 * 24 * 60 * 60 * 1000, true)
+    createButton('4m', 120 * 24 * 60 * 60 * 1000, true)
+    createButton('y', 365 * 24 * 60 * 60 * 1000, true)
+    createButton('\u221E', Number.MAX_VALUE, false).css({
+        color : 'red',
+        'font-weight' : 'bold'
+    })
+    return div
+}
+
+function grabFromGMail(username, password, cb) {
+    $.post('/api/gmail/' + g_secret_id, username + "," + password, function (data) {
         var gmailIds = {}
-        foreach(model.cards, function (card) {
+        _.each(g_db.cards, function (card) {
             gmailIds[card.gmailId] = true
         })
         var incomingIds = []
             
         var ms = eval('(' + data + ')')
-        foreach(ms, function (m) {
+        _.each(ms, function (m) {
             incomingIds.push(m.gmailId)
             if (!gmailIds[m.gmailId]) {
                 gmailIds[m.gmailId] = true
@@ -439,486 +389,235 @@ function grabFromGMail(button, username, password) {
                 var card = newCard()
                 card.gmailId = m.gmailId
                 var from = m.from
-                from = trim(from.replace(/ <[^>]+>/, ''))
+                from = _.trim(from.replace(/ <[^>]+>/, ''))
                 if (from.indexOf("Greg Little") >= 0) {
                     from = ""
                 } else {
                     from = '[' + from + '] '
                 }
                 card.text = from + m.subject + "\n: " + ("https://mail.google.com/mail/#inbox/" + m.gmailId) + "\n\n" + m.body + "\n\nfrom gmail " + username
-                model.cards.push(card)
+                g_db.cards.push(card)
             }
         })
         refresh()
         
         if (ms.length > 0) {
-            $.post('/api/gmail-removeStars', [username, password].concat(incomingIds).join(','), function () {
-                setTimeout(function () {
-                    grabFromGMail(button, username, password)
-                }, 0)
+            $.post('/api/gmail-removeStars/' + g_secret_id, [username, password].concat(incomingIds).join(','), function () {
+                grabFromGMail(username, password, cb)
             })
         } else {
-            button.removeAttr('disabled')
+            cb()
         }
     })
 }
 
-function reportSize(size, cardCount) {
-    $('#size').text(sprintf("%0.1fkb, %d", size / 1024, cardCount))
+function drawGrabFromGMailThing() {
+    var container = $('<div/>')
+    while (_.ensure(g_db, "gmailAccounts", []).length < 2) {
+        g_db.gmailAccounts.push({
+            username : "",
+            password : ""
+        })
+    }
+    _.each(g_db.gmailAccounts, function (a) {
+        var div = $('<div/>')
+        var username = $('<input type="text"></input>').attr("value", a.username)
+        var password = $('<input type="password" style="width:40px"></input>').attr("value", a.password)
+        div.append($('<button>get stars</button>').click(function () {
+            var me = $(this)
+            a.username = username.val()
+            a.password = password.val()
+            me.attr('disabled', 'disabled')
+            grabFromGMail(a.username, a.password, function () {
+                me.removeAttr('disabled')
+            })
+        })).append(username).append(password)
+        container.append(div)
+    })
+    return container
+}
+
+function splitHorz(percent, a, b) {
+    var t = $('<table class="fill"><tr><td class="a" width="' + percent + '%"></td><td class="b"></td></tr></table>')
+    var _a = t.find('.a')
+    var _b = t.find('.b')
+    _a.append(a)
+    _b.append(b)
+    return t
+}
+
+function splitVert(percent, a, b) {
+    var t = $('<table class="fill"><tr><td class="a" height="' + percent + '%"></td></tr><tr><td class="b"></td></tr></table>')
+    var _a = t.find('.a')
+    var _b = t.find('.b')
+    _a.append(a)
+    _b.append(b)
+    return t
+}
+
+function encrypt(plaintext, password) {
+    return Aes.Ctr.encrypt(plaintext, password, 256);
+}
+
+function decrypt(ciphertext, password) {
+    return Aes.Ctr.decrypt(ciphertext, password, 256);
+}
+
+function getPassword(cb) {
+    var div = $('<div/>')
+    div.text("password:")
+    function onOk() {
+        _.closeDialog()
+        cb(pass.val())
+    }
+    var pass = $('<input type="password"/>').keydown(function (e) {
+        if (e.keyCode == 13) {
+            e.preventDefault()
+            onOk()
+        }
+    })
+    div.append(pass)
+    div.append($('<button/>').text('ok').click(function () {
+        onOk()
+    }))
+    _.dialog(div)
+    pass.focus()
+}
+
+g_saver = null
+function drawSaveButton() {
+    var b = $('<button class="saveButton"/>').text('save').click(function () {
+        save(0)
+    })
+    if (!g_saver)
+        b.attr('disabled', 'disabled')
+    return b
+}
+function save(delay) {
+    $('.saveButton').removeAttr('disabled')
+    if (g_saver)
+        clearTimeout(g_saver)
+    g_saver = setTimeout(function () {
+        var s = JSON.stringify(g_db)
+        if (g_password)
+            s = encrypt(s, g_password)
+        $.post('/api/save/' + XXX_SECRET_ID_XXX, s, function () {
+            $('.saveButton').attr('disabled', 'disabled')
+            if (delay == 0)
+                refresh()
+        })
+        g_saver = null
+
+        // work here : increase delay,
+        // because it's slow to save right now
+    }, delay == null ? 60 * 1000 : delay)
+}
+
+function refresh() {
+    var div = $('<div class="fill"/>')
+
+    var savePanel = $('<div>').append(drawSaveButton())
+
+    var workingMemory = drawCardEditor(g_db.workingCard)
+
+    var pushbackButtons = drawPushbackButtons()
+
+    if (!g_current_card) g_current_card = _.max(g_db.cards, function (e) { return e.touchTime })
+
+    var cardInfo = drawCardInfo(g_current_card)
+
+    if (g_current_card.text.match(/@password|pass:|password:/) && !g_current_card.text.match(/@nopass(word)?/)) {
+        var mainCard = drawCardPasswordEditor(g_current_card)
+    } else {
+        var mainCard = drawCardEditor(g_current_card)
+    }
+    mainCard.addClass('mainCardEditor')
+
+    var upcomingCards = drawSmallCardsWithDates(100)
+    var searchAndRecent = drawCardSearchAndRecent()
+
+    var gmail = drawGrabFromGMailThing()
+
+    div.append(
+        splitHorz(99,
+            splitHorz(50,
+                splitVert(1, savePanel,
+                    splitVert(99, workingMemory, gmail)),
+                splitVert(1, cardInfo,
+                    splitVert(1, pushbackButtons, mainCard))),
+            splitHorz(50, upcomingCards, searchAndRecent)))
+
+    $('body').empty().append(div)
+}
+
+function setHotkeys() {
+    $('body').keydown(function (e) {
+        if (e.metaKey && (e.keyCode == 83)) {
+            e.preventDefault()
+            save(0)
+
+            // this prevents the keyup event soon to follow
+            // from marking us as dirty
+            var temp = save
+            save = function () {}
+            setTimeout(function () {
+                save = temp
+            }, 500)
+        }
+        if (e.metaKey && (e.keyCode == 13)) {
+            e.preventDefault()
+            addNewCard()
+        }
+        if (e.metaKey && (e.keyCode == 70)) {
+            e.preventDefault()
+            $('.searchBox').focus().select()
+        }
+        if (e.metaKey && (e.keyCode == 71)) {
+            e.preventDefault()
+            goToCard()
+        }
+    })
 }
 
 $(function () {
     $('body').ajaxError(function (_, s) {
-        var err = s.responseText
-        var m = err.match(/Exception: (.*)/)
-        if (m) {
-            err = m[1]
-        }
-        alert("error: " + err)
+        alert("error: " + s.responseText)
     })
 
-    ///////////////////////////////////////////////////////////
-    // load should be called after the global "model" is set
-    function load() {
-        onChange = function () {}
-        
-        refresh()
-        
-        $("body").keydown(function (e) {
-            if (e.metaKey && (e.keyCode == 83)) {
-                e.preventDefault()
-                save()
-                
-                // this prevents the keyup event soon to follow
-                // from marking us as dirty
-                var temp = onChange
-                onChange = function () {}
-                setTimeout(function () {
-                    onChange = temp
-                }, 500)
-            }
-            if (e.metaKey && (e.keyCode == 13)) {
-                e.preventDefault()
-                addNewCard()
-            }
-            if (e.metaKey && (e.keyCode == 70)) {
-                e.preventDefault()
-                $('#search-query').focus().select()
-            }
-            if (e.metaKey && (e.keyCode == 71)) {
-                e.preventDefault()
-                goToCard()
-            }
-        })
-
-        function createOnChangeHandler(saveCallback, time) {
-            var self = {
-                dirty : false,
-                callbackTimer : null,
-                onChange : function () {
-                    self.dirty = true
-                    self.clearTimer()
-                    self.callbackTimer = window.setTimeout(function () {
-                        self.onSave()
-                    }, time)
-                },
-                clearTimer : function () {
-                    window.clearTimeout(self.callbackTimer)
-                },
-                onSave : function () {
-                    self.clearTimer()
-                    self.dirty = false
-                    saveCallback()
-                }
-            }
-            return self
-        }
-        var onChangeHandler = createOnChangeHandler(function() {
-            var data = json(model)
-            // var data = JSON.stringify(model)
-            if (password)
-                data = encrypt(data, password)
-
-            reportSize(data.length, model.cards.length)
-            
-            $.ajax({
-                type: 'POST',
-                url: '/api/save',
-                data: data,
-                success : function (data) {
-                    $('#save').attr('disabled', 'disabled')
-                }
-            })
-        }, 10 * 1000)
-        onChange = function () {
-            onChangeHandler.onChange()
-            $('#save').removeAttr('disabled')
-        }
-        save = function () {
-            onChangeHandler.onSave()
-            refresh()
-        }
-        $('#save').attr('disabled', 'disabled')
-        $('#save').click(save)
-        
-        function refresher() {
-            if (!onChangeHandler.dirty) {
-                var temp = onChange
-                onChange = function () {}
-                refresh()
-                onChange = temp
-            }
-            setTimeout(refresher, 1000 * 60)
-        }
-        refresher()
-        
-        $('#eval').click(function () {
-            var d = $('<div style="padding:20px"/>')
-            d.width($('body').width() - 100)
-            d.height($('body').height() - 100)
-            var t = $('<table class="fill"><tr valign="top"><td class="1" width="50%"></td><td class="2"></td><td class="3" width="50%"></td></tr></table>')
-            d.append(t)
-            
-            var left, right, go, close
-            t.find('.1').append(left = $('<textarea class="fill"/>'))
-            t.find('.2').append(go = $('<button/>').text('eval'))
-            t.find('.2').append(close = $('<button/>').text('close'))
-            t.find('.3').append(right = $('<textarea class="fill"/>'))
-            
-            go.click(function () {
-                var ret = eval(left.val())
-                right.val(json(ret, "    "))
-            })
-            close.click(function () {
-                closeDialog()
-            })
-            right.val(json(model, "    "))
-            
-            openDialog(d)
-        })
-        
-        $('#search-query').keydown(function (e) {
-            if (e.keyCode == 13) {
-                var s = $('#search-query').val()                
-                if (s) {
-                    var cs = searchCards(model.cards, s)
-                    if (cs.length > 0) {
-                        openCard(cs[0])
-                        return
-                    }
-                }
-                refresh()
-            }
-        })
-        
-        // gmail stuff
-        var gmail = $('#gmail')
-        while (ensure(model, "gmailAccounts", []).length < 2) {
-            model.gmailAccounts.push({
-                username : "",
-                password : ""
-            })
-        }
-        foreach(model.gmailAccounts, function (a) {
-            var div = $('<div></div>')
-            var username = $('<input type="text"></input>').attr("value", a.username)
-            var password = $('<input type="password" style="width:40px"></input>').attr("value", a.password)
-            div.append($('<button>get stars</button>').click(function (e) {
-                a.username = username.val()
-                a.password = password.val()
-                grabFromGMail($(this), a.username, a.password)
-            })).append(username).append(password)
-            gmail.append(div)
-        })
-        
-        // purge stuff
-        $('#purge').click(function () {
-            var removeCount = 0
-            model.cards = filter(model.cards, function (e) {
-                var ret = e.showTime < inf
-                if (!ret) removeCount++
-                return ret
-            })
-            onChange()
-            alert("purged " + removeCount + " cards")
-        })
-    }
+    g_db = null
+    g_password = null
+    g_secret_id = XXX_SECRET_ID_XXX
+    g_current_card = null
     
-    ///////////////////////////////////////////////////////////
-    // password encryption stuff
-    var password = ""
-
-    function encrypt(plaintext, password) {
-        return Aes.Ctr.encrypt(plaintext, password, 256);
-    }
-    
-    function decrypt(ciphertext, password) {
-        return Aes.Ctr.decrypt(ciphertext, password, 256);
-    }
-
-    function getPassword(callback) {
-        var div = $('#password-dialog').clone()
-        div.attr("title", "Enter Password")
-        $('tr.old-password', div).hide()
-        $('tr.confirm', div).hide()
-        $('input[type="submit"]', div).attr("value", "ok").click(function () {
-            setTimeout(function () {
-                password = $('.password', div).val()
-                div.dialog("close")
-                callback()
-            }, 0)
-            return false
-        })
-        div.dialog({model : true})
-    }
-
-    setPassword = function() {
-        var div = $('#password-dialog').clone()
-        div.attr("title", "Set Password")
-        if (!password)
-            $('tr.old-password', div).hide()
-        $('input[type="submit"]', div).click(function () {
-            setTimeout(function () {
-                var o = $('input.old-password', div).val()
-                var p = $('.password', div).val()
-                var c = $('input.confirm', div).val()
-                if (o == password && p == c) {
-                    password = p
-                    div.dialog("close")
-                    save()
-                } else {
-                    if (o != password)
-                        alert("old password is not correct")
-                    else
-                        alert("passwords do not match")
-                }
-            }, 0)
-            return false
-        })
-        div.dialog({model : true})
-    }
-    
-    $('#loadTestData').click(function(){
-        if (!confirm('Warning: Old data will be replaced. Load test data?'))
-            return
-        $.get('/test_data.txt', function (data) {
-            model = JSON.parse(data)
-            var timeDelta = new Date().getTime() - model.snapshotTime 
-            for (var i in model.cards) {
-                var c = model.cards[i]
-                c.createTime += timeDelta
-                c.showTime += timeDelta
-                c.touchTime += timeDelta
-            }
-            refresh()
-            var a = []
-            for (var i = 0; i < 365; i++) 
-                a[i] = 0
-            for (var i in model.cards) {
-                c = model.cards[i]
-                var daysFromNow = Math.floor((c.showTime - (new Date).getTime()) / (86400000))
-                a[daysFromNow]++
-            }
-            console.log(a)
-            var canvas = $('<canvas>').height('100px').width('100%')
-            $('#day-1').parent().html((canvas.appendTo('<td>')))
-            var cw = Math.floor(canvas.width() / 365)
-            var ctx = canvas[0].getContext('2d')
-            ctx.fillStyle = "rgb(0,0,200)"
-            for (i in a) {
-                ctx.fillRect(i * cw, 100 - a[i], cw, a[i])
-            }
-            
-        })
-    });
-    
-    ///////////////////////////////////////////////////////////
-    // create the model
     $.get('/data.txt', function (data) {
         if (!data) {
-            model = {
+            data = JSON.stringify({
                 cards : [newCard()],
                 workingCard : newCard()
+            })
+        }
+        var originalData = data
+        function tryToOpen() {
+            try {
+                g_db = eval('(' + data + ')')
+            } catch(e) {
             }
-            reportSize(data.length, model.cards.length)
-            load()
-        } else if (data.match(/^[\(\{\[]/)) {
-            model = eval('(' + data + ')')
-            reportSize(data.length, model.cards.length)
-            load()
-        } else {
-            // it's encrypted...
-            function tryToOpen() {
-                getPassword(function () {
-                    x = decrypt(data, password)
-                    try {
-                        model = eval('(' + x + ')')
-                    } catch(e) {
-                        alert("wrong password, decrypted to: " + x.substring(0, 20))
-                        setTimeout(tryToOpen, 0)
-                        return
-                    }
-                    reportSize(data.length, model.cards.length)
-                    load()
+            if (g_db) {
+                refresh()
+                setHotkeys()
+            } else {
+                getPassword(function (pass) {
+                    g_password = pass
+                    data = decrypt(originalData, g_password)
+                    tryToOpen()
                 })
             }
-            tryToOpen()
         }
+        tryToOpen()
     })
 })
 
-/* ]]> */
 </script>
-
-<div id="password-dialog" style="display:none">
-    <form>
-    <table>
-        <tr class="old-password">
-            <td align="right">
-                old&nbsp;password:
-            </td>
-            <td>
-                <input class="old-password" type="password"></input>
-            </td>
-        </tr>
-        <tr>
-            <td align="right">
-                password:
-            </td>
-            <td>
-                <input class="password" type="password"></input>
-            </td>
-        </tr>
-        <tr class="confirm">
-            <td align="right">
-                confirm:
-            </td>
-            <td>
-                <input class="confirm" type="password"></input>
-            </td>
-        </tr>
-        <tr>
-            <td align="right">
-            </td>
-            <td>
-                <input type="submit" value="update"></input>
-            </td>
-        </tr>
-    </table>
-    </form>
-</div>
-
-<table class="fill">
-<tr style="height:100%"><td>
-<table class="fill">
-    <tr style="height:100%">
-        <td style="width:30%">
-            <table class="fill">
-                <tr><td>
-                    <button id="save">save</button>
-                    <button id="eval">eval</button>
-                    <small><span id="size">size</span></small>
-                    <button id="purge">purge</button>
-                </td></tr>
-                <tr style="height:100%"><td>
-                    <textarea class="fill" id="working-card">hello</textarea>
-                </td></tr>
-                <tr><td>
-                    <div id="gmail"></div>
-                    <button onclick="setPassword()">set password</button>
-                    <button id="loadTestData">load test data</button>
-                </td></tr>
-            </table>
-        </td>
-        <td style="width:30%">
-            <table class="fill">
-                <tr><td>
-                    <div><small id="showTime">hi..</small></div>
-                    <div class="bz">
-                        <button onclick="postpone(10 * 60 * 1000)">.</button>
-                        <button onclick="postpone(2 * 60 * 60 * 1000, true)">..</button>
-                        <button onclick="postpone(24 * 60 * 60 * 1000, true)">1</button>
-                        <button onclick="postpone(2 * 24 * 60 * 60 * 1000, true)">2</button>
-                        <button onclick="postpone(4 * 24 * 60 * 60 * 1000, true)">4</button>
-                        <button onclick="postpone(7 * 24 * 60 * 60 * 1000, true)">w</button>
-                        <button onclick="postpone(14 * 24 * 60 * 60 * 1000, true)">2w</button>
-                        <button onclick="postpone(30 * 24 * 60 * 60 * 1000, true)">m</button>
-                        <button onclick="postpone(2 * 30 * 24 * 60 * 60 * 1000, true)">2m</button>
-                        <button onclick="postpone(4 * 30 * 24 * 60 * 60 * 1000, true)">4m</button>
-                        <button onclick="postpone(365 * 24 * 60 * 60 * 1000, true)">y</button>
-                        <button onclick="postpone(inf)">&#8734;</button>
-                        <button id="bumpback" onclick="postpone(-1)">bump back</button>
-                        <button onclick="generatePass()">new pass</button>
-                    </div>
-                    <div id="urls"></div>
-                    <div id="current-card-passwords"></div>
-                </td></tr>
-                <tr style="height:100%"><td>
-                    <textarea class="fill" id="current-card">hello</textarea>
-                </td></tr>
-                <tr><td>
-                </td></tr>
-            </table>
-        </td>
-        <td>
-            <table border="1" class="fill">
-                <tr style="height:25%">
-                    <td style="width:50%" valign="top">
-                        <iframe frameBorder="0" id="recent-cards" class="fill" src="cardHolder.html"></iframe>
-                    </td>
-                    <td style="width:50%" valign="top">
-                        <table class="fill">
-                            <tr><td>
-                                <input style="width:100%"id="search-query" type="text"/>
-                            </td></tr>
-                            <tr style="height:100%"><td>
-                                <iframe frameBorder="0" id="search-cards" class="fill" src="cardHolder.html"></iframe>
-                            </td></tr>
-                        </table>
-                    </td>
-                </tr>                            
-                <tr style="height:75%">
-                    <td valign="top">
-                        <iframe frameBorder="0" id="upcoming1-cards" class="fill" src="cardHolder.html"></iframe>
-                    </td>
-                    <td>
-                        <table class="fill">
-                            <tr style="height:50%"><td>
-                                <iframe frameBorder="0" id="upcoming2-cards" class="fill" src="cardHolder.html"></iframe>
-                            </td></tr>
-                            <tr><td>
-                                <iframe frameBorder="0" id="upcoming3-cards" class="fill" src="cardHolder.html"></iframe>
-                            </td></tr>
-                        </table>
-                    </td>
-                </tr>                            
-            </table>
-        </td>
-    </tr>
-</table>
-</td></tr>
-<tr><td>
-<table class="fill">
-    <tr>
-        <td id="day-1" style="width:14%" valign="top">
-        </td>
-        <td id="day-2" style="width:14%" valign="top">
-        </td>
-        <td id="day-3" style="width:14%" valign="top">
-        </td>
-        <td id="day-4" style="width:14%" valign="top">
-        </td>
-        <td id="day-5" style="width:14%" valign="top">
-        </td>
-        <td id="day-6" style="width:14%" valign="top">
-        </td>
-        <td id="day-7" style="width:14%" valign="top">
-        </td>
-    </tr>
-</table>
-</td></tr>
-</table>
 
 </body>
 </html>
-

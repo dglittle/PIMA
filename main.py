@@ -10,6 +10,9 @@ import logging
 import gmail_imap
 import shutil
 import traceback
+import re
+
+XXX_SECRET_ID_XXX = str(random.random())
 
 class PimaMail:
     def __init__(self, username, password):
@@ -54,17 +57,17 @@ class MyHandler(BaseHTTPRequestHandler):
                 length = int(self.headers.getheader('content-length'))
                 postData = self.rfile.read(length)
             
-            if self.path == '/api/save':
+            if self.path == '/api/save/' + XXX_SECRET_ID_XXX:
                 shutil.copy('data.txt', 'backup.txt')
                 f = open('data.txt', 'w')
                 f.write(postData)
                 f.close()
-            elif self.path == '/api/gmail':
+            elif self.path == '/api/gmail/' + XXX_SECRET_ID_XXX:
                 params = postData.split(',')
                 pm = PimaMail(params[0], params[1])
                 s = json.dumps(pm.getStars())
                 pm.logout()
-            elif self.path == '/api/gmail-removeStars':
+            elif self.path == '/api/gmail-removeStars/' + XXX_SECRET_ID_XXX:
                 params = postData.split(',')
                 pm = PimaMail(params[0], params[1])
                 pm.removeStars(set(params[2:]))
@@ -73,8 +76,12 @@ class MyHandler(BaseHTTPRequestHandler):
                 p = self.path
                 if p == '/':
                     p = '/index.html'
+                # limit the files that can be opened
+                if not re.search(r"^(/data\.txt|/index\.html|/AES\.js)$", p):
+                    raise BaseException("access denied")
                 f = open('.' + p)
                 s = f.read()
+                s = s.replace('XXX_SECRET_ID_XXX', XXX_SECRET_ID_XXX)
                 f.close()
             
             self.send_response(200)
@@ -88,7 +95,7 @@ class MyHandler(BaseHTTPRequestHandler):
             self.wfile.write(traceback.format_exc())
 
 def main():
-    # ensure existance of data.txt
+    # ensure existence of data.txt
     try:
         f = open('./data.txt')
     except:
@@ -96,13 +103,10 @@ def main():
         f.close()
 
     # start up server
-    if (len(sys.argv) > 1):
-        server = HTTPServer(('', int(sys.argv[1])), MyHandler)
-        print("running server..")
-        server.serve_forever()
-    else:
-        print("usage: python main.py <port> (e.g. python main.py 12345)")
+    port = 12345
+    server = HTTPServer(('', port), MyHandler)
+    print("running server at localhost:" + str(port))
+    server.serve_forever()
 
 if __name__ == '__main__':
     main()
-
