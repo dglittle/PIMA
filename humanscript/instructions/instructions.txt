@@ -1,0 +1,26 @@
+- clone https://github.com/dglittle/PIMA
+- put these instructions in humanscript/<new folder>/instructions.txt
+- see README to run it
+- add "eval" button next to "save" button
+- pressing "eval" button should:
+    var div = new jquery div
+    var top = new jquery div
+    top.append("run" button)
+    top.append("close" button)
+    var input = textarea with 100% width and height
+    var output = textarea with 100% width and height
+    div.append(_.splitVert(1, top, _.splitHorz(50, input, output)))
+    "close" button should call _.closeDialog()
+    "run" should eval the code in input,
+        where any calls to console.log will print out to the output textarea
+    _.dialog(div)
+- test it
+    run it,
+    press "eval"
+    type: console.log("hi")
+    press "run"
+    should see "hi" in output
+    take screenshot
+    put in humanscript/<folder from above>
+- check in
+- make pull request to original repo	
