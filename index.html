@@ -517,21 +517,18 @@ function drawEvalButton(){
 		var div = $('<div />')
 		var top = $('<div />')
 		top.append($('<button class="runButton"/>').text('run').click(function(){
-			var str = $('#input-console').val().split('console.log')
-			res = []
-			_.each(str, function(e){
-				a = ('console.log'+e).match(/^console\.log\([\"\'](.*)[\"\']\)/)
-				if (a){
-					res.push(a[1])
-				}
-						
-			})	
-			console.log(res.join(' '))
+			var res = []
+			var oldConsoleLog = console.log
+			console.log = function (s) {
+			    res.push(s)
+			}
+			eval($('#input-console').val())
 			$('#output-console').val(res.join('\n'))	
+			console.log = oldConsoleLog
 		}))
 		top.append($('<button class="closeButton"/>').text('close').click(function(){
 			_.closeDialog()
-		}))
+		}))	
 		var input = $('<textarea id="input-console" style="width:500px; height:500px" />')
 		var output = $('<textarea id="output-console" style="width:500px; height:500px" />')
 		div.append(_.splitVert(1, top, _.splitHorz(50, input, output)))		
