@@ -327,7 +327,7 @@ function pushback(card, amount, fuzzy) {
         if (card.showTime > tomorrow) openNext = false
         card.showTime = today
         _.each(g_db.cards, function (c) {
-            if (c.showTime < tomorrow && c.showTime > card.showTime)
+            if (c.showTime < tomorrow && c.showTime >= card.showTime)
                 card.showTime = c.showTime + 1
         })
     }
