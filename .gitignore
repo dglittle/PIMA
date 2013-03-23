@@ -1,6 +1,5 @@
 *~
 *.pyc
-data.txt
-backup.txt
 data*.txt
+backup*.txt
 
