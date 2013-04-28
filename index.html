@@ -515,10 +515,7 @@ function save(delay) {
                 refresh()
         })
         g_saver = null
-
-        // work here : increase delay,
-        // because it's slow to save right now
-    }, delay == null ? 60 * 1000 : delay)
+    }, delay == null ? 5 * 1000 : delay)
 }
 function drawEvalButton(){
 	var b = $('<button class="evalButton"/>').text('eval').click(function () {
@@ -543,220 +540,6 @@ function drawEvalButton(){
 			_.dialog(div)
 		})
 	return b
-}
-
-function drawDimensions() {
-
-    // s = 1 if I win, 0 if they win, 0.5 if we tie.
-    // returns an array with new values
-    // for myR, myRD, theirR, theirRD
-    function glickoRatingUpdate(myR, myRD, theirR, theirRD, s) {
-        var pi2 = Math.PI * Math.PI
-        var q = Math.log(10) / 400
-        var q2 = q * q
-        
-        function helper(myR, myRD, theirR, theirRD, s) {
-            var myRD2 = myRD * myRD
-            var theirRD2 = theirRD * theirRD
-            var g = 1 / Math.sqrt(1 + 3 * q2 * theirRD2 / pi2)
-            var g2 = g * g
-            var E = 1 / (1 + Math.pow(
-                10, g * (myR - theirR) / -400))
-            var d2 = 1 / (q2 * g2 * E * (1 - E))
-            var temp = 1 / (1 / myRD2 + 1 / d2)
-            return [
-                myR + q * temp * g * (s - E),
-                Math.sqrt(temp)
-            ]
-        }
-        var a = helper(myR, myRD, theirR, theirRD, s)
-        var b = helper(theirR, theirRD, myR, myRD, 1 - s)
-        return a.concat(b)
-    }
-
-    function getCards() {
-        var timeCutoff = _.getStartOfDay(_.time()) + 24 * 60 * 60 * 1000
-        var cards = _.filter(g_db.cards, function (e) {
-            if (e.showTime < timeCutoff) {
-                _.ensure(e, 'glicko', {
-                    important : { r : 1500, rd : 500 },
-                    urgent : { r : 1500, rd : 500 },
-                    easy : { r : 1500, rd : 500 }
-                })
-                return true
-            }
-            delete e.glicko
-        })
-        function sort(cards, header) {
-            return _.sortBy(cards, function (c) {
-                return -c.glicko[header].r
-            })
-        }
-        function getMeta(cards, header) {
-            return _.max(cards, function (c) { return c.glicko[header].rd }).glicko[header].rd
-        }
-        var ret = { meta : {} }
-        _.each(['important', 'urgent', 'easy'], function (header) {
-            ret[header] = sort(cards, header)
-            ret.meta[header] = getMeta(ret[header], header)
-        })
-        return ret
-    }
-
-    function resolveCardComparison(header, winner, loser) {
-        var myG = winner.glicko[header]
-        var theirG = loser.glicko[header]
-        var updates = glickoRatingUpdate(myG.r, myG.rd, theirG.r, theirG.rd, 1)
-        winner.glicko[header] = { r : updates[0], rd : updates[1] }
-        loser.glicko[header] = { r : updates[2], rd : updates[3] }
-    }
-
-    function getBestComp(header) {
-        var cards = getCards()[header]
-        var a = _.max(cards, function (c) {
-            return c.glicko[header].rd
-        })
-        var b = _.min(cards, function (c) {
-            if (c == a) return Number.MAX_VALUE
-            return Math.abs(a.glicko[header].r - c.glicko[header].r)
-        })
-        return [a, b]
-    }
-
-    function drawGlicko(header, card) {
-        return card.glicko[header].r.toFixed(2) + ' \u00B1 ' + card.glicko[header].rd.toFixed(2)
-    }
-
-    function drawComparison(header, card1, card2, cb) {
-        var d = $('<div class="fill"/>')
-
-        function onDone(winner, loser) {
-            resolveCardComparison(header, winner, loser)
-            cb()
-        }
-        function onLeft() {
-            onDone(card1, card2)
-        }
-        function onRight() {
-            onDone(card2, card1)
-        }
-
-        function myDrawCardEditor(card, cb) {
-            var d = $('<div class="fill"/>')
-            return _.splitVert(1, $('<button style="width:100%;height:30px"/>').text('this one: ' + drawGlicko(header, card)).click(cb), _.splitVert(1, drawPushbackButtons(card, function () { cb() }), drawCardEditor(card)))
-        }
-
-        var c1 = myDrawCardEditor(card1, onLeft)
-        var c2 = myDrawCardEditor(card2, onRight)
-
-        var hotkeysValid = true
-        $('textarea', c1).focus(function () {
-            hotkeysValid = false
-        })
-        $('textarea', c2).focus(function () {
-            hotkeysValid = false
-        })
-
-        var hotkeyFunc = function (e) {
-            if ($.contains(document.documentElement, d[0])) {
-                if (hotkeysValid) {
-                    if (e.keyCode == 37) onLeft()
-                    if (e.keyCode == 39) onRight()
-                }
-            } else {
-                g_hotkeys.splice(g_hotkeys.indexOf(hotkeyFunc), 1)
-            }
-        }
-        g_hotkeys.push(hotkeyFunc)
-
-        d.append(_.splitVert(1, $('<div/>').text('Which is more ' + (header != 'important' ? header : header + '/beneficial') + '?'), _.splitHorz(50, c1, c2)))
-        return d
-    }
-
-    function openComparator(header) {
-        var d = $('<div style="width:800px;height:500px"/>')
-        var comp = $('<div class="fill"/>')
-        function showNextComp() {
-            var cs = getBestComp(header)
-            if (cs) {
-                comp.empty().append(drawComparison(header, cs[0], cs[1], function () {
-                    showNextComp()
-                }))
-            } else {
-                comp.empty().append($('<div/>').text('done for now!'))
-            }
-        }
-        showNextComp()
-        d.append(_.splitVert(99, comp, $('<button/>').text('close').click(function () {
-            _.closeDialog()
-            save()
-            refresh()
-        })))
-        _.dialog(d)
-    }
-
-    function drawSmallCard(card, cardBelow, header) {
-        var div = $('<div style="width:180px"/>')
-        var div2 = $('<div style="float:right;width:164px"/>')
-        div.append(div2)
-        div2.text(getTitle(card))
-        div.height('1.2em')
-        div.css('overflow', 'hidden')
-        div2.css('overflow', 'hidden')
-        div.css('background', card == g_current_card ? 'gold' : card.pareto ? 'lightgreen' : 'lightgrey')
-        div2.click(function() {
-            openCard(card)
-        })
-        div.append($('<div style="float:left;width:16px;height:16px"/>').html('&darr;').click(function () {
-            resolveCardComparison(header, cardBelow, card)
-            save()
-            refresh()
-        }))
-        div.append($('<div style="clear:both"/>'))
-        return div
-    }
-
-    function drawSmallCards(header, cards) {
-        var div = $('<div class="fill"/>')
-        div.css('overflow', 'auto')
-        _.each(cards, function (e, i) {
-            div.append(drawSmallCard(e, cards[i + 1], header).css('margin-bottom', '1px'))
-        })
-        return div
-    }
-
-    function myDrawSmallCards(header, cards, extra) {
-        var div = $('<div class="fill"/>')
-        div.css('overflow', 'auto')
-        div.append($('<div class="header" style="cursor:pointer;color:blue"/>').text(header + extra).click(function () {
-            openComparator(header)
-        }))
-        div.append(drawSmallCards(header, cards).removeClass('fill').css('width', '100%'))
-        return div
-    }
-
-    var cards = getCards()
-
-    // calc pareto frontier
-    var paretoCards = _.sortDesc(cards.important, function (c) { return c.glicko.important.r })
-    while (paretoCards.length > 0) {
-        var c = paretoCards.shift()
-        c.pareto = true
-        for (var i = paretoCards.length - 1; i >= 0; i--) {
-            var it = paretoCards[i]
-            if (it.glicko.important.r < c.glicko.important.r && it.glicko.urgent.r < c.glicko.urgent.r && it.glicko.easy.r < c.glicko.easy.r) {
-                it.pareto = false
-                paretoCards.splice(i, 1)
-            }
-        }
-    }
-
-    var lists = {}
-    _.each(['important', 'urgent', 'easy'], function (header) {
-        lists[header] = myDrawSmallCards(header, cards[header], ' (' + cards.meta[header].toFixed(1) + ')')
-    })
-
-    return _.splitHorz(33, lists.important, _.splitHorz(50, lists.urgent, lists.easy))
 }
 
 function refresh() {
@@ -784,8 +567,6 @@ function refresh() {
 
     var gmail = drawGrabFromGMailThing()
 
-    var dimensions = drawDimensions()
-
     div.append(
         splitHorz(99,
             splitHorz(50,
@@ -793,9 +574,7 @@ function refresh() {
                     splitVert(99, workingMemory, gmail)),
                 splitVert(1, cardInfo,
                     splitVert(1, pushbackButtons, mainCard))),
-            splitVert(50,
-                splitHorz(50, upcomingCards, searchAndRecent),
-                dimensions)
+            splitHorz(50, upcomingCards, searchAndRecent)
         )
     )
 
