@@ -77,7 +77,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 if p == '/':
                     p = '/index.html'
                 # limit the files that can be opened
-                if not re.search(r"^(/data\.txt|/index\.html|/AES\.js)$", p):
+                if not re.search(r"^(/data\.txt|/index\.html|/AES\.js|u_new\.js)$", p):
                     raise BaseException("access denied")
                 f = open('.' + p)
                 s = f.read()

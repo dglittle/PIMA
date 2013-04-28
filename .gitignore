@@ -2,4 +2,4 @@
 *.pyc
 data*.txt
 backup*.txt
-
+/_*
