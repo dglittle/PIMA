@@ -27,8 +27,8 @@ th, td {
 </head>
 <body>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
-<script src="https://raw.github.com/dglittle/myutil/master/u.js"></script>
-<script src="https://raw.github.com/dglittle/myutil/master/tab.js"></script>
+<script src="http://dglittle.github.io/gl519/index.js"></script>
+<script src="http://dglittle.github.io/cdn/tab.js"></script>
 <script src="AES.js"></script>
 <script src="u_new.js"></script>
 <script>
@@ -77,8 +77,8 @@ function openCard(card) {
     refresh()
 }
 
-function newCard() {
-    var now = _.time()
+function newCard(now) {
+    now = now || _.time()
     return {
         text : "",
         createTime : now,
@@ -389,12 +389,13 @@ function grabFromGMail(username, password, cb) {
         var incomingIds = []
             
         var ms = eval('(' + data + ')')
+        var now = _.time()
         _.each(ms, function (m) {
             incomingIds.push(m.gmailId)
             if (!gmailIds[m.gmailId]) {
                 gmailIds[m.gmailId] = true
                 
-                var card = newCard()
+                var card = newCard(now++)
                 card.gmailId = m.gmailId
                 var from = m.from
                 from = _.trim(from.replace(/ <[^>]+>/, ''))
@@ -493,59 +494,52 @@ function getPassword(cb) {
 }
 
 g_saver = null
-function drawSaveButton() {
+function drawSavePanel() {
+    var d = $('<div/>')
     var b = $('<button class="saveButton"/>').text('save').click(function () {
         save(0)
     })
     if (!g_saver)
         b.attr('disabled', 'disabled')
-    return b
+    d.append(b)
+    d.append($('<span class="saveMessage" style="font-size:x-small"/>'))
+    return d
 }
 function save(delay) {
     $('.saveButton').removeAttr('disabled')
     if (g_saver)
         clearTimeout(g_saver)
     g_saver = setTimeout(function () {
+        var startTime = _.time()
+        var msg = []
         var s = JSON.stringify(g_db)
-        if (g_password)
+        msg.push('size: ' + size_format(s.length))
+
+        var deadSize = size_format(JSON.stringify(_.filter(g_db.cards, function (c) { return c.showTime >= Number.MAX_VALUE })).length - 2)
+
+        if (g_password) {
             s = encrypt(s, g_password)
+        }
         $.post('/api/save/' + XXX_SECRET_ID_XXX, s, function () {
             $('.saveButton').attr('disabled', 'disabled')
-            if (delay == 0)
+            if (delay == 0) {
                 refresh()
+                var endTime = _.time()
+                msg.push('time: ' + ((endTime - startTime) / 1000).toFixed(2) + "s")
+                $('.saveMessage').append($('<span style="margin-left:7px;margin-right:7px"/>').text(msg.join(', '))).append($('<button style="font-size:x-small"/>').text('purge: ' + (deadSize)).click(function () {
+                    g_db.cards = _.filter(g_db.cards, function (c) { return c.showTime < Number.MAX_VALUE })
+                    save(0)
+                }))
+            }
         })
         g_saver = null
     }, delay == null ? 5 * 1000 : delay)
-}
-function drawEvalButton(){
-	var b = $('<button class="evalButton"/>').text('eval').click(function () {
-		var div = $('<div />')
-		var top = $('<div />')
-		top.append($('<button class="runButton"/>').text('run').click(function(){
-			var res = []
-			var oldConsoleLog = console.log
-			console.log = function (s) {
-			    res.push(s)
-			}
-			eval($('#input-console').val())
-			$('#output-console').val(res.join('\n'))	
-			console.log = oldConsoleLog
-		}))
-		top.append($('<button class="closeButton"/>').text('close').click(function(){
-			_.closeDialog()
-		}))	
-		var input = $('<textarea id="input-console" style="width:500px; height:500px" />')
-		var output = $('<textarea id="output-console" style="width:500px; height:500px" />')
-		div.append(_.splitVert(1, top, _.splitHorz(50, input, output)))		
-			_.dialog(div)
-		})
-	return b
 }
 
 function refresh() {
     var div = $('<div class="fill"/>')
 
-    var savePanel = $('<div>').append(drawSaveButton()).append(drawEvalButton())
+    var savePanel = drawSavePanel()
 
     var workingMemory = drawCardEditor(g_db.workingCard)
 
